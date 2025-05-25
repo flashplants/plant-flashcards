@@ -32,9 +32,11 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    // Only redirect if we're sure there's no user
+    // Only redirect if we're sure there's no user and we're on a protected route
     if (!isLoading && !user && (pathname === '/flashcards' || pathname === '/dashboard')) {
-      router.push('/');
+      // Store the intended destination
+      sessionStorage.setItem('intendedDestination', pathname);
+      router.replace('/');
     }
   }, [user, pathname, router, isLoading]);
 
@@ -42,6 +44,15 @@ export default function Header() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      
+      // If we have a user and an intended destination, redirect there
+      if (user) {
+        const intendedDestination = sessionStorage.getItem('intendedDestination');
+        if (intendedDestination) {
+          sessionStorage.removeItem('intendedDestination');
+          router.replace(intendedDestination);
+        }
+      }
     } catch (error) {
       console.error('Error checking user:', error);
     } finally {
@@ -53,7 +64,7 @@ export default function Header() {
     try {
       await supabase.auth.signOut();
       setUser(null);
-      router.push('/');
+      router.replace('/');
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -147,9 +158,15 @@ export default function Header() {
       <AuthModal 
         isOpen={showAuth} 
         onClose={() => setShowAuth(false)}
-        onAuthSuccess={(user) => {
+        onSuccess={(user) => {
           setUser(user);
           setShowAuth(false);
+          // Check for intended destination after successful login
+          const intendedDestination = sessionStorage.getItem('intendedDestination');
+          if (intendedDestination) {
+            sessionStorage.removeItem('intendedDestination');
+            router.replace(intendedDestination);
+          }
         }}
       />
     </header>
