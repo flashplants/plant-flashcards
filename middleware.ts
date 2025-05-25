@@ -41,9 +41,18 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
+  // If user is signed in and trying to access / with a redirect parameter,
+  // redirect them to the intended destination
+  if (session && req.nextUrl.pathname === '/' && req.nextUrl.searchParams.has('redirectedFrom')) {
+    const redirectTo = req.nextUrl.searchParams.get('redirectedFrom')
+    if (redirectTo) {
+      return NextResponse.redirect(new URL(redirectTo, req.url))
+    }
+  }
+
   return res
 }
 
 export const config = {
-  matcher: ['/flashcards/:path*', '/dashboard/:path*'],
+  matcher: ['/', '/flashcards/:path*', '/dashboard/:path*'],
 } 
