@@ -633,35 +633,31 @@ export default function PlantFlashcardApp() {
             )}
           </div>
 
-          {imageUrl && (
-            <div className="mb-6 flex justify-center">
-              <img
-                src={imageUrl}
-                alt={currentPlant.common_name}
-                className="max-h-64 max-w-full object-contain rounded-lg shadow-md"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-
           <div 
             className="min-h-[200px] flex items-center justify-center cursor-pointer"
             onClick={flipCard}
           >
-            <div className="text-center">
+            <div className="text-center w-full">
               {!showAnswer ? (
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                    {currentPlant.scientific_name}
-                  </h2>
-                  <p className="text-gray-500">Click to reveal common name</p>
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt="Plant"
+                      className="max-h-64 max-w-full object-contain rounded-lg shadow-md mx-auto"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <p className="text-gray-500">No image available</p>
+                  )}
+                  <p className="text-gray-500 mt-4">Click to reveal scientific name</p>
                 </div>
               ) : (
                 <div>
                   <h2 className="text-2xl font-bold text-green-700 mb-2">
-                    {currentPlant.common_name}
+                    {currentPlant.scientific_name}
                   </h2>
                   <p className="text-gray-600 mb-1">
                     Family: {currentPlant.family}
