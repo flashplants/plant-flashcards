@@ -34,11 +34,10 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession()
 
   // If user is not signed in and the current path is not /,
-  // redirect the user to /
+  // redirect the user to / with the intended destination
   if (!session && (req.nextUrl.pathname.startsWith('/flashcards') || req.nextUrl.pathname.startsWith('/dashboard'))) {
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = '/'
-    redirectUrl.searchParams.set(`redirectedFrom`, req.nextUrl.pathname)
+    const redirectUrl = new URL('/', req.url)
+    redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
