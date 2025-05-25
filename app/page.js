@@ -16,11 +16,18 @@ function PlantList() {
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [authRedirect, setAuthRedirect] = useState(null);
 
   useEffect(() => {
     checkUser();
   }, []);
+
+  useEffect(() => {
+    // Show auth modal if we have a redirect parameter
+    const redirectedFrom = searchParams.get('redirectedFrom');
+    if (redirectedFrom && !user) {
+      setShowAuth(true);
+    }
+  }, [searchParams, user]);
 
   const checkUser = async () => {
     try {
@@ -123,7 +130,6 @@ function PlantList() {
         isOpen={showAuth} 
         onClose={() => {
           setShowAuth(false);
-          setAuthRedirect(null);
         }}
         onSuccess={handleAuthSuccess}
       />
