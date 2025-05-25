@@ -17,6 +17,7 @@ import {
   LogIn,
   Image as ImageIcon
 } from 'lucide-react';
+import Header from './components/Header';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -417,317 +418,292 @@ export default function PlantFlashcardApp() {
   const imageUrl = getImageUrl(currentPlant);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
-      {/* Auth Modal */}
-      {showAuth && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
-            <h2 className="text-2xl font-bold mb-4">
-              {authMode === 'login' ? 'Login' : 'Sign Up'}
-            </h2>
-            <form onSubmit={handleAuth}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-2 border rounded mb-3"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-2 border rounded mb-4"
-                required
-              />
-              <button
-                type="submit"
-                className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700"
-              >
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Auth Modal */}
+        {showAuth && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+              <h2 className="text-2xl font-bold mb-4">
                 {authMode === 'login' ? 'Login' : 'Sign Up'}
-              </button>
-            </form>
-            <p className="text-center mt-4 text-sm">
-              {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
+              </h2>
+              <form onSubmit={handleAuth}>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-2 border rounded mb-3"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-2 border rounded mb-4"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700"
+                >
+                  {authMode === 'login' ? 'Login' : 'Sign Up'}
+                </button>
+              </form>
+              <p className="text-center mt-4 text-sm">
+                {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
+                <button
+                  onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                  className="text-green-600 hover:underline"
+                >
+                  {authMode === 'login' ? 'Sign Up' : 'Login'}
+                </button>
+              </p>
               <button
-                onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                className="text-green-600 hover:underline"
+                onClick={() => setShowAuth(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
               >
-                {authMode === 'login' ? 'Sign Up' : 'Login'}
+                <X className="w-6 h-6" />
               </button>
-            </p>
-            <button
-              onClick={() => setShowAuth(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-green-800">Plant Flashcards</h1>
-          <div className="flex gap-2">
-            {user ? (
-              <>
-                <span className="text-sm text-gray-600 py-2 px-3">
-                  {user.email}
-                </span>
-                <button
-                  onClick={signOut}
-                  className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                >
-                  <User className="w-5 h-5" />
-                </button>
-              </>
-            ) : (
+        <div className="max-w-4xl mx-auto">
+          {/* Filters */}
+          <div className="mb-6 bg-white rounded-lg shadow-md p-4">
+            <div className="flex flex-wrap gap-2 mb-3">
               <button
-                onClick={() => setShowAuth(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                <LogIn className="w-5 h-5" />
-                Login
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="mb-6 bg-white rounded-lg shadow-md p-4">
-          <div className="flex flex-wrap gap-2 mb-3">
-            <button
-              onClick={() => {
-                setFilterMode('all');
-                setSelectedCollection(null);
-              }}
-              className={`px-3 py-1 rounded-md ${
-                filterMode === 'all' && !selectedCollection
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              All Plants ({plants.length})
-            </button>
-            {user && (
-              <>
-                <button
-                  onClick={() => {
-                    setFilterMode('favorites');
-                    setSelectedCollection(null);
-                  }}
-                  className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                    filterMode === 'favorites'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
-                  <Heart className="w-4 h-4" />
-                  Favorites ({favorites.size})
-                </button>
-                <button
-                  onClick={() => {
-                    setFilterMode('sightings');
-                    setSelectedCollection(null);
-                  }}
-                  className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                    filterMode === 'sightings'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
-                  <Eye className="w-4 h-4" />
-                  My Sightings
-                </button>
-                <button
-                  onClick={() => {
-                    setFilterMode('testable');
-                    setSelectedCollection(null);
-                  }}
-                  className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                    filterMode === 'testable'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
-                  <Check className="w-4 h-4" />
-                  Test Me
-                </button>
-              </>
-            )}
-          </div>
-          
-          {collections.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <select
-                value={selectedCollection || ''}
-                onChange={(e) => {
-                  setSelectedCollection(e.target.value || null);
-                  setFilterMode('collection');
+                onClick={() => {
+                  setFilterMode('all');
+                  setSelectedCollection(null);
                 }}
-                className="flex-1 p-2 border rounded-md"
-              >
-                <option value="">Select a collection...</option>
-                {collections.map(col => (
-                  <option key={col.id} value={col.id}>
-                    {col.name} {col.user_id === user?.id && '(My Collection)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="mb-6 bg-white rounded-lg shadow-md p-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-gray-600">Progress: {progress}%</span>
-            <button
-              onClick={resetSession}
-              className="flex items-center gap-2 px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-            >
-              <RotateCw className="w-4 h-4" />
-              Reset
-            </button>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-            <div 
-              className="bg-green-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-          <div className="flex justify-center gap-8 text-sm">
-            <div className="flex items-center gap-2">
-              <Check className="w-5 h-5 text-green-600" />
-              <span className="text-gray-700">Correct: {stats.correct}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <X className="w-5 h-5 text-red-600" />
-              <span className="text-gray-700">Incorrect: {stats.incorrect}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Flashcard */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-sm text-gray-500">
-              Card {currentIndex + 1} of {displayPlants.length}
-            </span>
-            {user && (
-              <button
-                onClick={toggleFavorite}
-                className={`p-2 rounded-lg transition-colors ${
-                  favorites.has(currentPlant.id)
-                    ? 'text-red-500 bg-red-50 hover:bg-red-100'
-                    : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
+                className={`px-3 py-1 rounded-md ${
+                  filterMode === 'all' && !selectedCollection
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300'
                 }`}
               >
-                <Heart className={`w-5 h-5 ${favorites.has(currentPlant.id) ? 'fill-current' : ''}`} />
+                All Plants ({plants.length})
               </button>
+              {user && (
+                <>
+                  <button
+                    onClick={() => {
+                      setFilterMode('favorites');
+                      setSelectedCollection(null);
+                    }}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-md ${
+                      filterMode === 'favorites'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                  >
+                    <Heart className="w-4 h-4" />
+                    Favorites ({favorites.size})
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFilterMode('sightings');
+                      setSelectedCollection(null);
+                    }}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-md ${
+                      filterMode === 'sightings'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                  >
+                    <Eye className="w-4 h-4" />
+                    My Sightings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFilterMode('testable');
+                      setSelectedCollection(null);
+                    }}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-md ${
+                      filterMode === 'testable'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                  >
+                    <Check className="w-4 h-4" />
+                    Test Me
+                  </button>
+                </>
+              )}
+            </div>
+            
+            {collections.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-600" />
+                <select
+                  value={selectedCollection || ''}
+                  onChange={(e) => {
+                    setSelectedCollection(e.target.value || null);
+                    setFilterMode('collection');
+                  }}
+                  className="flex-1 p-2 border rounded-md"
+                >
+                  <option value="">Select a collection...</option>
+                  {collections.map(col => (
+                    <option key={col.id} value={col.id}>
+                      {col.name} {col.user_id === user?.id && '(My Collection)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
 
-          <div 
-            className="min-h-[200px] flex items-center justify-center cursor-pointer"
-            onClick={flipCard}
-          >
-            <div className="text-center w-full">
-              {!showAnswer ? (
-                <div>
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt="Plant"
-                      className="max-h-64 max-w-full object-contain rounded-lg shadow-md mx-auto"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <p className="text-gray-500">No image available</p>
-                  )}
-                  <p className="text-gray-500 mt-4">Click to reveal scientific name</p>
-                </div>
-              ) : (
-                <div>
-                  <h2 className="text-2xl font-bold text-green-700 mb-2">
-                    {currentPlant.scientific_name}
-                  </h2>
-                  <p className="text-gray-600 mb-1">
-                    Family: {currentPlant.family}
-                  </p>
-                  {currentPlant.native_to && (
-                    <p className="text-gray-600 text-sm mb-1">
-                      Native to: {currentPlant.native_to}
-                    </p>
-                  )}
-                  {currentPlant.bloom_period && (
-                    <p className="text-gray-600 text-sm mb-1">
-                      Blooms: {currentPlant.bloom_period}
-                    </p>
-                  )}
-                  {currentPlant.description && (
-                    <p className="text-gray-600 text-sm mt-4 max-w-md mx-auto">
-                      {currentPlant.description}
-                    </p>
-                  )}
-                </div>
-              )}
+          {/* Stats */}
+          <div className="mb-6 bg-white rounded-lg shadow-md p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-gray-600">Progress: {progress}%</span>
+              <button
+                onClick={resetSession}
+                className="flex items-center gap-2 px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+              >
+                <RotateCw className="w-4 h-4" />
+                Reset
+              </button>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+              <div 
+                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-center gap-8 text-sm">
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-green-600" />
+                <span className="text-gray-700">Correct: {stats.correct}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <X className="w-5 h-5 text-red-600" />
+                <span className="text-gray-700">Incorrect: {stats.incorrect}</span>
+              </div>
             </div>
           </div>
 
-          {showAnswer && !answered.has(currentIndex) && (
-            <div className="flex justify-center gap-4 mt-6">
-              <button
-                onClick={() => markAnswer(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                <Check className="w-5 h-5" />
-                I knew it!
-              </button>
-              <button
-                onClick={() => markAnswer(false)}
-                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                <X className="w-5 h-5" />
-                I didn't know
-              </button>
+          {/* Flashcard */}
+          <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm text-gray-500">
+                Card {currentIndex + 1} of {displayPlants.length}
+              </span>
+              {user && (
+                <button
+                  onClick={toggleFavorite}
+                  className={`p-2 rounded-lg transition-colors ${
+                    favorites.has(currentPlant.id)
+                      ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                      : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
+                  }`}
+                >
+                  <Heart className={`w-5 h-5 ${favorites.has(currentPlant.id) ? 'fill-current' : ''}`} />
+                </button>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between items-center">
-          <button
-            onClick={prevCard}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md"
-          >
-            <ChevronLeft className="w-5 h-5" />
-            Previous
-          </button>
-          
-          <button
-            onClick={flipCard}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:shadow-md"
-          >
-            {showAnswer ? 'Show Question' : 'Show Answer'}
-          </button>
+            <div 
+              className="min-h-[200px] flex items-center justify-center cursor-pointer"
+              onClick={flipCard}
+            >
+              <div className="text-center w-full">
+                {!showAnswer ? (
+                  <div>
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt="Plant"
+                        className="max-h-64 max-w-full object-contain rounded-lg shadow-md mx-auto"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <p className="text-gray-500">No image available</p>
+                    )}
+                    <p className="text-gray-500 mt-4">Click to reveal scientific name</p>
+                  </div>
+                ) : (
+                  <div>
+                    <h2 className="text-2xl font-bold text-green-700 mb-2">
+                      {currentPlant.scientific_name}
+                    </h2>
+                    <p className="text-gray-600 mb-1">
+                      Family: {currentPlant.family}
+                    </p>
+                    {currentPlant.native_to && (
+                      <p className="text-gray-600 text-sm mb-1">
+                        Native to: {currentPlant.native_to}
+                      </p>
+                    )}
+                    {currentPlant.bloom_period && (
+                      <p className="text-gray-600 text-sm mb-1">
+                        Blooms: {currentPlant.bloom_period}
+                      </p>
+                    )}
+                    {currentPlant.description && (
+                      <p className="text-gray-600 text-sm mt-4 max-w-md mx-auto">
+                        {currentPlant.description}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
-          <button
-            onClick={nextCard}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md"
-          >
-            Next
-            <ChevronRight className="w-5 h-5" />
-          </button>
+            {showAnswer && !answered.has(currentIndex) && (
+              <div className="flex justify-center gap-4 mt-6">
+                <button
+                  onClick={() => markAnswer(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Check className="w-5 h-5" />
+                  I knew it!
+                </button>
+                <button
+                  onClick={() => markAnswer(false)}
+                  className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  <X className="w-5 h-5" />
+                  I didn't know
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex justify-between items-center">
+            <button
+              onClick={prevCard}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md"
+            >
+              <ChevronLeft className="w-5 h-5" />
+              Previous
+            </button>
+            
+            <button
+              onClick={flipCard}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:shadow-md"
+            >
+              {showAnswer ? 'Show Question' : 'Show Answer'}
+            </button>
+
+            <button
+              onClick={nextCard}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md"
+            >
+              Next
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
