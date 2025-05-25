@@ -22,15 +22,6 @@ function PlantList() {
     checkUser();
   }, []);
 
-  useEffect(() => {
-    // Check for redirect from middleware
-    const redirectedFrom = searchParams.get('redirectedFrom');
-    if (redirectedFrom) {
-      setAuthRedirect(redirectedFrom);
-      setShowAuth(true);
-    }
-  }, [searchParams]);
-
   const checkUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -53,8 +44,7 @@ function PlantList() {
     if (user) {
       router.push('/flashcards');
     } else {
-      setAuthRedirect('/flashcards');
-      setShowAuth(true);
+      router.push('/?redirectedFrom=/flashcards');
     }
   };
 
@@ -62,16 +52,16 @@ function PlantList() {
     if (user) {
       router.push('/dashboard');
     } else {
-      setAuthRedirect('/dashboard');
-      setShowAuth(true);
+      router.push('/?redirectedFrom=/dashboard');
     }
   };
 
   const handleAuthSuccess = async (user) => {
     setUser(user);
     setShowAuth(false);
-    if (authRedirect) {
-      router.replace(authRedirect);
+    const redirectedFrom = searchParams.get('redirectedFrom');
+    if (redirectedFrom) {
+      router.replace(redirectedFrom);
     }
   };
 
