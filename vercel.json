@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/flashcards",
+      "destination": "/flashcards"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/dashboard"
+    }
+  ]
+} 
