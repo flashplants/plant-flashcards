@@ -18,6 +18,7 @@ import {
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
 import { supabase } from '../lib/supabase';
+import Footer from '../components/Footer';
 
 // Debounce function
 const debounce = (func, wait) => {
@@ -447,7 +448,7 @@ export default function PlantFlashcardApp() {
   const imageUrl = getImageUrl(currentPlant);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-16">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <AuthModal 
@@ -692,6 +693,7 @@ export default function PlantFlashcardApp() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 } 
