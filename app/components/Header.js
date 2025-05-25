@@ -4,21 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, LayoutDashboard, Leaf, LogIn, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import AuthModal from './AuthModal';
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  }
-);
+import { supabase } from '../lib/supabase';
 
 export default function Header() {
   const pathname = usePathname();

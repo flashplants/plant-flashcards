@@ -2,28 +2,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Leaf, LayoutDashboard } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  }
-);
+import { supabase } from './lib/supabase';
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,10 +21,21 @@ export default function Home() {
     checkUser();
   }, []);
 
+  useEffect(() => {
+    // Check for redirect from middleware
+    const redirectedFrom = searchParams.get('redirectedFrom');
+    if (redirectedFrom) {
+      setAuthRedirect(redirectedFrom);
+      setShowAuth(true);
+    }
+  }, [searchParams]);
+
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+      }
     } catch (error) {
       console.error('Error checking user:', error);
     } finally {
@@ -59,6 +58,14 @@ export default function Home() {
     } else {
       setAuthRedirect('/dashboard');
       setShowAuth(true);
+    }
+  };
+
+  const handleAuthSuccess = async (user) => {
+    setUser(user);
+    setShowAuth(false);
+    if (authRedirect) {
+      router.push(authRedirect);
     }
   };
 
@@ -113,13 +120,7 @@ export default function Home() {
           setShowAuth(false);
           setAuthRedirect(null);
         }}
-        onAuthSuccess={(user) => {
-          setUser(user);
-          setShowAuth(false);
-          if (authRedirect) {
-            router.push(authRedirect);
-          }
-        }}
+        onSuccess={handleAuthSuccess}
       />
     </div>
   );

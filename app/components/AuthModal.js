@@ -1,21 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { X } from 'lucide-react';
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  }
-);
+import { supabase } from '../lib/supabase';
 
 export default function AuthModal({ isOpen, onClose, onSuccess }) {
   const [authMode, setAuthMode] = useState('login');
@@ -25,7 +12,18 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Check for existing session
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        onSuccess?.(session.user);
+        onClose();
+      }
+    };
+    checkSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         onSuccess?.(session.user);
         onClose();
@@ -49,8 +47,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
           password,
         });
         if (error) throw error;
-        if (data?.user) {
-          onSuccess?.(data.user);
+        if (data?.session?.user) {
+          onSuccess?.(data.session.user);
           onClose();
         }
       } else {
@@ -62,8 +60,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
           }
         });
         if (error) throw error;
-        if (data?.user) {
-          onSuccess?.(data.user);
+        if (data?.session?.user) {
+          onSuccess?.(data.session.user);
           onClose();
         }
       }
