@@ -16,28 +16,39 @@ export default function Header() {
 
   useEffect(() => {
     checkUser();
-  }, []);
 
-  useEffect(() => {
-    // Only redirect if we're sure there's no user and we're on a protected route
-    if (!isLoading && !user && (pathname === '/flashcards' || pathname === '/dashboard')) {
-      // Store the intended destination
-      sessionStorage.setItem('intendedDestination', pathname);
-      router.replace('/');
-    }
-  }, [user, pathname, router, isLoading]);
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        setUser(session?.user ?? null);
+        // If we have a redirect, handle it
+        const redirectedFrom = new URLSearchParams(window.location.search).get('redirectedFrom');
+        if (redirectedFrom) {
+          router.replace(redirectedFrom);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        if (pathname !== '/') {
+          router.replace('/');
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [pathname, router]);
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
       
       // If we have a user and an intended destination, redirect there
-      if (user) {
-        const intendedDestination = sessionStorage.getItem('intendedDestination');
-        if (intendedDestination) {
-          sessionStorage.removeItem('intendedDestination');
-          router.replace(intendedDestination);
+      if (session?.user) {
+        const redirectedFrom = new URLSearchParams(window.location.search).get('redirectedFrom');
+        if (redirectedFrom) {
+          router.replace(redirectedFrom);
         }
       }
     } catch (error) {
@@ -142,17 +153,16 @@ export default function Header() {
           </div>
         </div>
       </div>
-      <AuthModal 
-        isOpen={showAuth} 
+      <AuthModal
+        isOpen={showAuth}
         onClose={() => setShowAuth(false)}
         onSuccess={(user) => {
           setUser(user);
           setShowAuth(false);
-          // Check for intended destination after successful login
-          const intendedDestination = sessionStorage.getItem('intendedDestination');
-          if (intendedDestination) {
-            sessionStorage.removeItem('intendedDestination');
-            router.replace(intendedDestination);
+          // If we have a redirect, handle it
+          const redirectedFrom = new URLSearchParams(window.location.search).get('redirectedFrom');
+          if (redirectedFrom) {
+            router.replace(redirectedFrom);
           }
         }}
       />
