@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { X } from 'lucide-react';
 
@@ -12,7 +12,8 @@ const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-    },
+      detectSessionInUrl: true
+    }
   }
 );
 
@@ -22,6 +23,19 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        onSuccess?.(session.user);
+        onClose();
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [onSuccess, onClose]);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -36,17 +50,20 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
         });
         if (error) throw error;
         if (data?.user) {
-          onSuccess?.();
+          onSuccess?.(data.user);
           onClose();
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          }
         });
         if (error) throw error;
         if (data?.user) {
-          onSuccess?.();
+          onSuccess?.(data.user);
           onClose();
         }
       }
