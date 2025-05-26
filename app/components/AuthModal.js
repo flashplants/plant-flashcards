@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
 export default function AuthModal({ isOpen, onClose, onSuccess }) {
@@ -10,30 +11,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    // Check for existing session
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        onSuccess?.(session.user);
-        onClose();
-      }
-    };
-    checkSession();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        onSuccess?.(session.user);
-        onClose();
-      }
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [onSuccess, onClose]);
+  const { signIn, signUp } = useAuth();
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -41,16 +19,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
     setLoading(true);
 
     try {
+      let result;
       if (authMode === 'login') {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        if (data?.session?.user) {
-          onSuccess?.(data.session.user);
-          onClose();
-        }
+        result = data;
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -60,11 +36,13 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
           }
         });
         if (error) throw error;
-        if (data?.session?.user) {
-          onSuccess?.(data.session.user);
-          onClose();
-        }
+        result = data;
       }
+      
+      if (onSuccess) {
+        onSuccess(result.user);
+      }
+      onClose();
     } catch (error) {
       setError(error.message);
     } finally {

@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
+import { supabase } from '../lib/supabase';
 
 // Debounce function
 const debounce = (func, wait) => {
@@ -42,13 +43,13 @@ export default function PlantFlashcardApp() {
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
   const [answered, setAnswered] = useState(new Set());
-  const [user, setUser] = useState(null);
   const [favorites, setFavorites] = useState(new Set());
-  const [filterMode, setFilterMode] = useState('all'); // all, favorites, sightings, testable
+  const [filterMode, setFilterMode] = useState('all');
   const [collections, setCollections] = useState([]);
   const [selectedCollection, setSelectedCollection] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
+  const { user, isAuthenticated } = useAuth();
 
   // Memoize fetchUserData to prevent recreation on every render
   const fetchUserData = async () => {
@@ -92,11 +93,6 @@ export default function PlantFlashcardApp() {
     fetchPlants();
   }, []);
 
-  // Check user only once on mount
-  useEffect(() => {
-    checkUser();
-  }, []);
-
   // Update filtered plants when dependencies change
   useEffect(() => {
     if (plants.length === 0) return;
@@ -110,24 +106,38 @@ export default function PlantFlashcardApp() {
 
     switch (filterMode) {
       case 'favorites':
-        filtered = plants.filter(p => favorites.has(p.id));
+        if (isAuthenticated) {
+          filtered = plants.filter(p => favorites.has(p.id));
+        } else {
+          setShowAuth(true);
+          setFilterMode('all');
+          return;
+        }
         break;
       case 'sightings':
-        if (user) {
+        if (isAuthenticated) {
           fetchUserSightings();
+          return;
+        } else {
+          setShowAuth(true);
+          setFilterMode('all');
           return;
         }
         break;
       case 'testable':
-        if (user) {
+        if (isAuthenticated) {
           fetchTestablePlants();
+          return;
+        } else {
+          setShowAuth(true);
+          setFilterMode('all');
           return;
         }
         break;
     }
 
     setFilteredPlants(filtered);
-  }, [filterMode, selectedCollection, favorites, plants]);
+  }, [filterMode, selectedCollection, favorites, plants, isAuthenticated]);
 
   // Fetch user data when user changes
   useEffect(() => {
@@ -135,17 +145,6 @@ export default function PlantFlashcardApp() {
       fetchUserData();
     }
   }, [user]);
-
-  const checkUser = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-      }
-    } catch (error) {
-      console.error('Error checking user:', error);
-    }
-  };
 
   const fetchPlants = async () => {
     setLoading(true);
@@ -286,14 +285,8 @@ export default function PlantFlashcardApp() {
     return shuffled;
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setFavorites(new Set());
-  };
-
   const toggleFavorite = async () => {
-    if (!user) {
+    if (!isAuthenticated) {
       setShowAuth(true);
       return;
     }
@@ -301,24 +294,28 @@ export default function PlantFlashcardApp() {
     const plant = displayPlants[currentIndex];
     const isFavorite = favorites.has(plant.id);
 
-    if (isFavorite) {
-      await supabase
-        .from('favorites')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('plant_id', plant.id);
-      
-      setFavorites(prev => {
-        const next = new Set(prev);
-        next.delete(plant.id);
-        return next;
-      });
-    } else {
-      await supabase
-        .from('favorites')
-        .insert({ user_id: user.id, plant_id: plant.id });
-      
-      setFavorites(prev => new Set([...prev, plant.id]));
+    try {
+      if (isFavorite) {
+        await supabase
+          .from('favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('plant_id', plant.id);
+        
+        setFavorites(prev => {
+          const next = new Set(prev);
+          next.delete(plant.id);
+          return next;
+        });
+      } else {
+        await supabase
+          .from('favorites')
+          .insert({ user_id: user.id, plant_id: plant.id });
+        
+        setFavorites(prev => new Set([...prev, plant.id]));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
     }
   };
 
@@ -454,10 +451,6 @@ export default function PlantFlashcardApp() {
         <AuthModal 
           isOpen={showAuth} 
           onClose={() => setShowAuth(false)}
-          onSuccess={(user) => {
-            setUser(user);
-            fetchUserData();
-          }}
         />
 
         <div className="max-w-4xl mx-auto">

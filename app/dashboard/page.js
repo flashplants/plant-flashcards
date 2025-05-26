@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Edit, 
   Trash2, 
@@ -21,6 +22,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ShieldAlert
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
@@ -95,29 +97,44 @@ export default function PlantsDashboard() {
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { user: authUser } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    checkUser();
-    fetchPlants();
-  }, []);
+    const checkAdminStatus = async () => {
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', authUser.id)
+          .single();
+        if (!profile?.is_admin) {
+          router.replace('/');
+          setLoading(false);
+          return;
+        }
+        setIsAdmin(true);
+        fetchPlants();
+      }
+      setLoading(false);
+    };
+
+    checkAdminStatus();
+  }, [authUser, router]);
 
   useEffect(() => {
-    if (user) {
+    if (authUser) {
       fetchUserData();
     }
-  }, [user]);
-
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
-  };
+  }, [authUser]);
 
   const fetchUserData = async () => {
     // Fetch user's favorites
     const { data: favData } = await supabase
       .from('favorites')
       .select('plant_id')
-      .eq('user_id', user.id);
+      .eq('user_id', authUser.id);
     
     if (favData) {
       setFavorites(new Set(favData.map(f => f.plant_id)));
@@ -329,7 +346,7 @@ export default function PlantsDashboard() {
   };
 
   const toggleFavorite = async (plant) => {
-    if (!user) {
+    if (!authUser) {
       alert('Please log in to add favorites');
       return;
     }
@@ -341,7 +358,7 @@ export default function PlantsDashboard() {
         await supabase
           .from('favorites')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', authUser.id)
           .eq('plant_id', plant.id);
         
         setFavorites(prev => {
@@ -352,7 +369,7 @@ export default function PlantsDashboard() {
       } else {
         await supabase
           .from('favorites')
-          .insert({ user_id: user.id, plant_id: plant.id });
+          .insert({ user_id: authUser.id, plant_id: plant.id });
         
         setFavorites(prev => new Set([...prev, plant.id]));
       }
@@ -453,6 +470,22 @@ export default function PlantsDashboard() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+            <p className="text-gray-600">You must be an administrator to access this page.</p>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }

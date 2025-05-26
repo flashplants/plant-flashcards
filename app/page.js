@@ -31,9 +31,9 @@ function PlantList() {
 
   const checkUser = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
         // If we have a redirect and a user, redirect them
         const redirectedFrom = searchParams.get('redirectedFrom');
         if (redirectedFrom) {
