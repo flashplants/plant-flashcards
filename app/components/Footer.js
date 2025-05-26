@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, BookOpen, LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, House, GalleryHorizontalEnd, CircleGauge } from 'lucide-react';
 
 export default function Footer() {
   const pathname = usePathname();
@@ -19,7 +19,7 @@ export default function Footer() {
                 : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
             }`}
           >
-            <Home className="w-5 h-5" />
+            <House className="w-5 h-5" />
             <span className="text-xs font-medium">Home</span>
           </Link>
           <Link
@@ -30,7 +30,7 @@ export default function Footer() {
                 : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
             }`}
           >
-            <LayoutDashboard className="w-5 h-5" />
+            <CircleGauge className="w-5 h-5" />
             <span className="text-xs font-medium">Dashboard</span>
           </Link>
           <Link
@@ -41,7 +41,7 @@ export default function Footer() {
                 : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
             }`}
           >
-            <BookOpen className="w-5 h-5" />
+            <GalleryHorizontalEnd className="w-5 h-5" />
             <span className="text-xs font-medium">Flashcards</span>
           </Link>
         </div>

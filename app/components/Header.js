@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, LayoutDashboard, Leaf, LogIn, LogOut } from 'lucide-react';
+import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, House, CircleGauge } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -55,7 +55,7 @@ export default function Header() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <Link href="/" className="flex items-center">
-              <Leaf className="h-8 w-8 text-green-600" />
+              <Leaf className="w-5 h-5 text-green-600" />
               <span className="ml-2 text-xl font-bold text-gray-900">Plant Flashcards</span>
             </Link>
           </div>
@@ -69,7 +69,7 @@ export default function Header() {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Home className="w-4 h-4 mr-1" />
+              <House className="w-4 h-4 mr-1" />
               Home
             </Link>
 
@@ -81,7 +81,7 @@ export default function Header() {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Leaf className="w-4 h-4 mr-1" />
+              <GalleryHorizontalEnd className="w-4 h-4 mr-1" />
               Flashcards
             </Link>
 
@@ -94,7 +94,7 @@ export default function Header() {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <LayoutDashboard className="w-4 h-4 mr-1" />
+                <CircleGauge className="w-4 h-4 mr-1" />
                 Admin Dashboard
               </Link>
             )}
@@ -107,7 +107,9 @@ export default function Header() {
                 disabled={isSigningOut}
                 className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
               >
-                <LogOut className="w-4 h-4 mr-2" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 {isSigningOut ? 'Signing out...' : 'Sign Out'}
               </button>
             ) : (
@@ -115,7 +117,10 @@ export default function Header() {
                 onClick={() => setShowAuth(true)}
                 className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               >
-                <LogIn className="w-4 h-4 mr-2" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M15 7a2 2 0 012 2m4 0a2 2 0 012-2m-4-4a2 2 0 00-2 2m4 0a2 2 0 002-2m-4-4a2 2 0 00-2 2m4 0a2 2 0 002-2" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 12a9 9 0 1118 0 9 9 0 01-18 0z" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 Sign In
               </button>
             )}

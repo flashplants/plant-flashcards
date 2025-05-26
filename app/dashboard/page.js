@@ -4,25 +4,24 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Edit, 
-  Trash2, 
-  Plus, 
-  Image as ImageIcon,
-  Save,
-  X,
-  ChevronDown,
-  ChevronUp,
-  Heart,
-  Edit2,
-  Upload,
+import PlantImageManager from '../components/PlantImageManager';
+import BulkImageUpload from '../components/BulkImageUpload';
+import {
+  AlertCircle,
+  CheckCircle,
+  File,
+  Image,
   Star,
-  LogIn,
+  Trash2,
+  Upload,
+  X,
+  Plus,
+  Edit,
+  Save,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  ShieldAlert
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
@@ -56,6 +55,22 @@ const convertToWebP = async (file) => {
 const generateSuffix = () => {
   return Math.random().toString(36).substring(2, 6);
 };
+
+function buildFullPlantName(plant) {
+  // Remove punctuation and join all relevant fields
+  const clean = (str) => str ? str.replace(/[^a-zA-Z0-9-]/g, '') : '';
+  return [
+    plant.genus,
+    plant.specific_epithet,
+    plant.infraspecies_rank,
+    plant.infraspecies_epithet,
+    plant.variety,
+    plant.cultivar
+  ]
+    .map(clean)
+    .filter(Boolean)
+    .join(' ');
+}
 
 export default function PlantsDashboard() {
   const [plants, setPlants] = useState([]);
@@ -92,7 +107,6 @@ export default function PlantsDashboard() {
   const [favorites, setFavorites] = useState(new Set());
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [dragOverPlant, setDragOverPlant] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -273,78 +287,6 @@ export default function PlantsDashboard() {
     }
   };
 
-  const handleImageUpload = async (plantId, file) => {
-    try {
-      setUploadingImage(true);
-      
-      // Convert to WebP
-      const webpBlob = await convertToWebP(file);
-      
-      // Get plant data for naming
-      const plant = plants.find(p => p.id === plantId);
-      if (!plant) throw new Error('Plant not found');
-      
-      // Create filename: scientific-name-suffix.webp
-      const baseName = plant.scientific_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-      const suffix = generateSuffix();
-      const fileName = `${baseName}-${suffix}.webp`;
-      
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('plant-images')
-        .upload(fileName, webpBlob, {
-          contentType: 'image/webp',
-          cacheControl: '3600'
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Create plant_image record
-      const { error: dbError } = await supabase
-        .from('plant_images')
-        .insert({
-          plant_id: plantId,
-          path: fileName,
-          is_primary: true
-        });
-
-      if (dbError) throw dbError;
-
-      fetchPlants();
-    } catch (err) {
-      console.error('Error uploading image:', err);
-      alert('Error uploading image: ' + err.message);
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  const handleDragOver = (e, plantId) => {
-    e.preventDefault();
-    setDragOverPlant(plantId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverPlant(null);
-  };
-
-  const handleDrop = async (e, plantId) => {
-    e.preventDefault();
-    setDragOverPlant(null);
-    
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-    
-    // Only process the first image
-    const file = files[0];
-    if (!file.type.startsWith('image/')) {
-      alert('Please drop an image file');
-      return;
-    }
-    
-    await handleImageUpload(plantId, file);
-  };
-
   const toggleFavorite = async (plant) => {
     if (!authUser) {
       alert('Please log in to add favorites');
@@ -407,7 +349,7 @@ export default function PlantsDashboard() {
             onClick={() => setCurrentPage(1)}
             disabled={currentPage === 1}
           >
-            <ChevronsLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button
             variant="outline"
@@ -441,7 +383,7 @@ export default function PlantsDashboard() {
             onClick={() => setCurrentPage(totalPages)}
             disabled={currentPage === totalPages}
           >
-            <ChevronsRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
         <div className="flex items-center gap-2">
@@ -480,7 +422,7 @@ export default function PlantsDashboard() {
         <Header />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
-            <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
             <p className="text-gray-600">You must be an administrator to access this page.</p>
           </div>
@@ -534,7 +476,7 @@ export default function PlantsDashboard() {
                       : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
                 >
-                  <Heart className={`w-5 h-5 ${showFavoritesOnly ? 'fill-red-400' : ''}`} />
+                  <Star className={`w-5 h-5 ${showFavoritesOnly ? 'fill-red-400' : ''}`} />
                   {showFavoritesOnly ? 'Show All' : 'Show Favorites'}
                 </button>
               )}
@@ -554,20 +496,11 @@ export default function PlantsDashboard() {
               <h2 className="text-xl font-semibold mb-4">Add New Plant</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="scientific_name">Scientific Name</Label>
-                  <Input
-                    id="scientific_name"
-                    placeholder="Scientific Name"
-                    value={newPlant.scientific_name}
-                    onChange={(e) => setNewPlant({ ...newPlant, scientific_name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="common_name">Common Name</Label>
                   <Input
                     id="common_name"
                     placeholder="Common Name"
-                    value={newPlant.common_name}
+                    value={newPlant.common_name || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, common_name: e.target.value })}
                   />
                 </div>
@@ -576,7 +509,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="family"
                     placeholder="Family"
-                    value={newPlant.family}
+                    value={newPlant.family || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, family: e.target.value })}
                   />
                 </div>
@@ -585,7 +518,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="genus"
                     placeholder="Genus"
-                    value={newPlant.genus}
+                    value={newPlant.genus || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, genus: e.target.value })}
                   />
                 </div>
@@ -594,7 +527,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="species"
                     placeholder="Species"
-                    value={newPlant.species}
+                    value={newPlant.species || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, species: e.target.value })}
                   />
                 </div>
@@ -603,7 +536,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="specific_epithet"
                     placeholder="Specific Epithet"
-                    value={newPlant.specific_epithet}
+                    value={newPlant.specific_epithet || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, specific_epithet: e.target.value })}
                   />
                 </div>
@@ -612,7 +545,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="subspecies"
                     placeholder="Subspecies"
-                    value={newPlant.subspecies}
+                    value={newPlant.subspecies || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, subspecies: e.target.value })}
                   />
                 </div>
@@ -621,7 +554,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="variety"
                     placeholder="Variety"
-                    value={newPlant.variety}
+                    value={newPlant.variety || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, variety: e.target.value })}
                   />
                 </div>
@@ -630,7 +563,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="cultivar"
                     placeholder="Cultivar"
-                    value={newPlant.cultivar}
+                    value={newPlant.cultivar || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, cultivar: e.target.value })}
                   />
                 </div>
@@ -639,7 +572,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="native_to"
                     placeholder="Native To"
-                    value={newPlant.native_to}
+                    value={newPlant.native_to || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, native_to: e.target.value })}
                   />
                 </div>
@@ -648,7 +581,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="bloom_period"
                     placeholder="Bloom Period"
-                    value={newPlant.bloom_period}
+                    value={newPlant.bloom_period || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, bloom_period: e.target.value })}
                   />
                 </div>
@@ -657,7 +590,7 @@ export default function PlantsDashboard() {
                   <Input
                     id="slug"
                     placeholder="Slug"
-                    value={newPlant.slug}
+                    value={newPlant.slug || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, slug: e.target.value })}
                   />
                 </div>
@@ -675,7 +608,7 @@ export default function PlantsDashboard() {
                   <Textarea
                     id="description"
                     placeholder="Description"
-                    value={newPlant.description}
+                    value={newPlant.description || ''}
                     onChange={(e) => setNewPlant({ ...newPlant, description: e.target.value })}
                     rows="3"
                   />
@@ -705,48 +638,20 @@ export default function PlantsDashboard() {
                 <div 
                   key={plant.id} 
                   className="p-6"
-                  onDragOver={(e) => handleDragOver(e, plant.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, plant.id)}
                 >
                   <div className="flex items-start gap-6">
-                    {/* Image Upload Area */}
-                    <div 
-                      className={`relative w-32 h-32 flex-shrink-0 rounded-lg border-2 border-dashed transition-all duration-200 ${
-                        dragOverPlant === plant.id 
-                          ? 'border-green-500 bg-green-50 scale-105' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      {editingPlant?.id === plant.id ? (
-                        <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleImageUpload(plant.id, e.target.files[0])}
-                            className="hidden"
-                          />
-                          <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
-                          <span className="text-sm text-gray-500">Click to upload</span>
-                        </label>
+                    {/* Plant Image */}
+                    <div className="w-32 h-32 flex-shrink-0">
+                      {plant.plant_images?.[0] ? (
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[0].path}`}
+                          alt={buildFullPlantName(plant)}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
                       ) : (
-                        plant.plant_images?.[0] ? (
-                          <img
-                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[0].path}`}
-                            alt={plant.scientific_name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center">
-                            <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
-                            <span className="text-sm text-gray-500">Drop image here</span>
-                          </div>
-                        )
-                      )}
-                      {dragOverPlant === plant.id && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-50 bg-opacity-90 rounded-lg">
-                          <Upload className="w-8 h-8 text-green-500 mb-2" />
-                          <span className="text-sm text-green-600 font-medium">Drop to upload</span>
+                        <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                          <Image className="w-8 h-8 text-gray-400 mb-2" />
+                          <span className="text-sm text-gray-500">No image</span>
                         </div>
                       )}
                     </div>
@@ -758,18 +663,10 @@ export default function PlantsDashboard() {
                           <CardContent className="p-0 space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label htmlFor="scientific_name">Scientific Name</Label>
-                                <Input
-                                  id="scientific_name"
-                                  value={editingPlant.scientific_name}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, scientific_name: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
                                 <Label htmlFor="common_name">Common Name</Label>
                                 <Input
                                   id="common_name"
-                                  value={editingPlant.common_name}
+                                  value={editingPlant.common_name || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, common_name: e.target.value })}
                                 />
                               </div>
@@ -777,7 +674,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="genus">Genus</Label>
                                 <Input
                                   id="genus"
-                                  value={editingPlant.genus}
+                                  value={editingPlant.genus || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, genus: e.target.value })}
                                 />
                               </div>
@@ -785,7 +682,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="species">Species</Label>
                                 <Input
                                   id="species"
-                                  value={editingPlant.species}
+                                  value={editingPlant.species || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, species: e.target.value })}
                                 />
                               </div>
@@ -793,7 +690,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="specific_epithet">Specific Epithet</Label>
                                 <Input
                                   id="specific_epithet"
-                                  value={editingPlant.specific_epithet}
+                                  value={editingPlant.specific_epithet || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, specific_epithet: e.target.value })}
                                 />
                               </div>
@@ -801,7 +698,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="hybrid_marker">Hybrid Marker</Label>
                                 <Input
                                   id="hybrid_marker"
-                                  value={editingPlant.hybrid_marker}
+                                  value={editingPlant.hybrid_marker || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker: e.target.value })}
                                 />
                               </div>
@@ -809,7 +706,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="hybrid_marker_position">Hybrid Marker Position</Label>
                                 <select
                                   id="hybrid_marker_position"
-                                  value={editingPlant.hybrid_marker_position}
+                                  value={editingPlant.hybrid_marker_position || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker_position: e.target.value })}
                                   className="w-full rounded-md border border-input bg-background px-3 py-2"
                                 >
@@ -823,7 +720,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="infraspecies_rank">Infraspecies Rank</Label>
                                 <Input
                                   id="infraspecies_rank"
-                                  value={editingPlant.infraspecies_rank}
+                                  value={editingPlant.infraspecies_rank || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_rank: e.target.value })}
                                 />
                               </div>
@@ -831,7 +728,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="infraspecies_epithet">Infraspecies Epithet</Label>
                                 <Input
                                   id="infraspecies_epithet"
-                                  value={editingPlant.infraspecies_epithet}
+                                  value={editingPlant.infraspecies_epithet || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_epithet: e.target.value })}
                                 />
                               </div>
@@ -839,7 +736,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="subspecies">Subspecies</Label>
                                 <Input
                                   id="subspecies"
-                                  value={editingPlant.subspecies}
+                                  value={editingPlant.subspecies || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, subspecies: e.target.value })}
                                 />
                               </div>
@@ -847,7 +744,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="variety">Variety</Label>
                                 <Input
                                   id="variety"
-                                  value={editingPlant.variety}
+                                  value={editingPlant.variety || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, variety: e.target.value })}
                                 />
                               </div>
@@ -855,7 +752,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="cultivar">Cultivar</Label>
                                 <Input
                                   id="cultivar"
-                                  value={editingPlant.cultivar}
+                                  value={editingPlant.cultivar || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, cultivar: e.target.value })}
                                 />
                               </div>
@@ -863,7 +760,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="family">Family</Label>
                                 <Input
                                   id="family"
-                                  value={editingPlant.family}
+                                  value={editingPlant.family || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, family: e.target.value })}
                                 />
                               </div>
@@ -871,7 +768,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="native_to">Native To</Label>
                                 <Input
                                   id="native_to"
-                                  value={editingPlant.native_to}
+                                  value={editingPlant.native_to || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, native_to: e.target.value })}
                                 />
                               </div>
@@ -879,7 +776,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="bloom_period">Bloom Period</Label>
                                 <Input
                                   id="bloom_period"
-                                  value={editingPlant.bloom_period}
+                                  value={editingPlant.bloom_period || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, bloom_period: e.target.value })}
                                 />
                               </div>
@@ -887,7 +784,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="slug">Slug</Label>
                                 <Input
                                   id="slug"
-                                  value={editingPlant.slug}
+                                  value={editingPlant.slug || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, slug: e.target.value })}
                                 />
                               </div>
@@ -904,7 +801,7 @@ export default function PlantsDashboard() {
                                 <Label htmlFor="description">Description</Label>
                                 <Textarea
                                   id="description"
-                                  value={editingPlant.description}
+                                  value={editingPlant.description || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, description: e.target.value })}
                                   rows={3}
                                 />
@@ -922,7 +819,24 @@ export default function PlantsDashboard() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex justify-end gap-2 pt-2">
+
+                            {/* Image Management Section */}
+                            <div className="pt-6 border-t">
+                              <Label className="text-base font-semibold mb-4 block">Plant Images</Label>
+                              <PlantImageManager
+                                plantId={editingPlant.id}
+                                plantName={buildFullPlantName(editingPlant)}
+                                genus={editingPlant.genus}
+                                specific_epithet={editingPlant.specific_epithet}
+                                infraspecies_rank={editingPlant.infraspecies_rank}
+                                variety={editingPlant.variety}
+                                cultivar={editingPlant.cultivar}
+                                supabase={supabase}
+                                onImagesChange={() => fetchPlants()}
+                              />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-4">
                               <Button
                                 variant="outline"
                                 onClick={() => setEditingPlant(null)}
@@ -942,11 +856,7 @@ export default function PlantsDashboard() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <h3 className="text-lg font-semibold text-gray-900">
-                              {plant.genus} {plant.hybrid_marker_position === 'genus' ? '×' : ''} {plant.species}
-                              {plant.hybrid_marker_position === 'species' ? ' ×' : ''} {plant.subspecies && ` subsp. ${plant.subspecies}`}
-                              {plant.variety && ` var. ${plant.variety}`}
-                              {plant.cultivar && ` '${plant.cultivar}'`}
-                              {plant.hybrid_marker_position === 'infraspecies' ? ' ×' : ''}
+                              {buildFullPlantName(plant)}
                             </h3>
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                               plant.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -1014,7 +924,7 @@ export default function PlantsDashboard() {
                               onClick={() => toggleFavorite(plant)}
                               className={favorites.has(plant.id) ? 'text-red-500' : 'text-gray-400'}
                             >
-                              <Heart className={`w-5 h-5 ${favorites.has(plant.id) ? 'fill-current' : ''}`} />
+                              <Star className={`w-5 h-5 ${favorites.has(plant.id) ? 'fill-current' : ''}`} />
                             </Button>
                           )}
                           <Button
@@ -1022,7 +932,7 @@ export default function PlantsDashboard() {
                             size="icon"
                             onClick={() => handleEdit(plant)}
                           >
-                            <Edit2 className="w-5 h-5" />
+                            <Edit className="w-5 h-5" />
                           </Button>
                           <Button
                             variant="ghost"

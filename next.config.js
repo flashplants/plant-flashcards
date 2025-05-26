@@ -17,6 +17,10 @@ const nextConfig = {
   trailingSlash: false,
   // Enable strict mode for better error detection
   reactStrictMode: true,
+  transpilePackages: ['lucide-react'],
+  experimental: {
+    optimizePackageImports: false,
+  },
 }
 
 module.exports = nextConfig

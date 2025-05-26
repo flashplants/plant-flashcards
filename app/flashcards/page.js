@@ -1,19 +1,20 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  RotateCw, 
-  Check, 
-  X, 
-  Heart, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  RotateCw,
+  Check,
+  X,
+  Heart,
   Eye,
   EyeOff,
   Filter,
   User,
   LogIn,
-  Image as ImageIcon
+  Image,
+  File
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
