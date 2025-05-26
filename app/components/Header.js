@@ -1,3 +1,4 @@
+// app/components/Header.js
 'use client';
 
 import Link from 'next/link';
@@ -6,14 +7,14 @@ import { Home, LayoutDashboard, Leaf, LogIn, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [showAuth, setShowAuth] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { user, signOut } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const { user, signOut, supabase } = useAuth();
   
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -31,15 +32,20 @@ export default function Header() {
     };
 
     checkAdminStatus();
-  }, [user]);
+  }, [user, supabase]);
 
   const handleSignOut = async () => {
+    if (isSigningOut) return; // Prevent double-clicks
+    
+    setIsSigningOut(true);
     try {
       await signOut();
-      // Force a reload to clear all state and context
-      window.location.href = '/';
+      // Remove the immediate redirect - let auth state handle it
+      router.refresh(); // This will trigger a page refresh after sign out
     } catch (error) {
       console.error('Error signing out:', error);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -98,10 +104,11 @@ export default function Header() {
             {user ? (
               <button
                 onClick={handleSignOut}
-                className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                disabled={isSigningOut}
+                className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
+                {isSigningOut ? 'Signing out...' : 'Sign Out'}
               </button>
             ) : (
               <button
@@ -121,4 +128,4 @@ export default function Header() {
       />
     </header>
   );
-} 
+}
