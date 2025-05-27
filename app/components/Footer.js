@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, House, GalleryHorizontalEnd, CircleGauge } from 'lucide-react';
+import { LayoutDashboard, House, GalleryHorizontalEnd, CircleGauge, Leaf } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
@@ -54,6 +54,17 @@ export default function Footer() {
             <span className="text-xs font-medium">Home</span>
           </Link>
           <Link
+            href="/plants"
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              pathname === '/plants'
+                ? 'text-green-600 bg-green-50'
+                : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+            }`}
+          >
+            <Leaf className="w-5 h-5" />
+            <span className="text-xs font-medium">Plants</span>
+          </Link>
+          <Link
             href="/flashcards"
             className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
               pathname === '/flashcards'
@@ -64,18 +75,20 @@ export default function Footer() {
             <GalleryHorizontalEnd className="w-5 h-5" />
             <span className="text-xs font-medium">Flashcards</span>
           </Link>
-          <Link
-            href="/dashboard"
-            onClick={handleDashboardClick}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-              pathname === '/dashboard'
-                ? 'text-green-600 bg-green-50'
-                : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-            }`}
-          >
-            <CircleGauge className="w-5 h-5" />
-            <span className="text-xs font-medium">Admin Dashboard</span>
-          </Link>
+          {isAdmin && (
+            <Link
+              href="/dashboard"
+              onClick={handleDashboardClick}
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+                pathname === '/dashboard'
+                  ? 'text-green-600 bg-green-50'
+                  : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+              }`}
+            >
+              <CircleGauge className="w-5 h-5" />
+              <span className="text-xs font-medium">Admin</span>
+            </Link>
+          )}
         </div>
       </nav>
       <AuthModal 
