@@ -207,7 +207,10 @@ export default function PlantFlashcardApp() {
     // Apply sightings filter first
     if (sightingsFilter !== 'all') {
       const minSightings = parseInt(sightingsFilter);
-      filtered = filtered.filter(plant => plant.sightings_count >= minSightings);
+      filtered = filtered.filter(plant => {
+        const sightingsCount = plant.global_sighting_counts?.[0]?.sighting_count || 0;
+        return sightingsCount >= minSightings;
+      });
     }
 
     // Then apply other filters
@@ -533,7 +536,10 @@ export default function PlantFlashcardApp() {
   const getSightingsCount = (minSightings) => {
     if (minSightings === 'all') return plants.length;
     const minCount = parseInt(minSightings);
-    return plants.filter(plant => (plant.sightings_count || 0) >= minCount).length;
+    return plants.filter(plant => {
+      const sightingsCount = plant.global_sighting_counts?.[0]?.sighting_count || 0;
+      return sightingsCount >= minCount;
+    }).length;
   };
 
   // Add fullscreen toggle function
