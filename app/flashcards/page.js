@@ -773,7 +773,7 @@ export default function PlantFlashcardApp() {
           )}
 
           {/* Flashcard */}
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+          <div className={`bg-white rounded-xl shadow-lg p-8 mb-6 ${isFullscreen ? 'h-[90vh] flex flex-col' : 'min-h-[600px] flex flex-col'}`}>
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm text-gray-500">
                 Card {currentIndex + 1} of {displayPlants.length}
@@ -805,51 +805,69 @@ export default function PlantFlashcardApp() {
             </div>
 
             <div 
-              className={`flex items-center justify-center cursor-pointer ${isFullscreen ? 'min-h-[80vh]' : 'min-h-[200px]'}`}
+              className={`flex-1 flex items-center justify-center cursor-pointer ${
+                isFullscreen 
+                  ? 'h-[calc(90vh-8rem)]' 
+                  : 'h-[calc(600px-8rem)]'
+              }`}
               onClick={flipCard}
             >
-              <div className="text-center w-full">
+              <div className="text-center w-full h-full flex items-center justify-center">
                 {!showAnswer ? (
-                  <div>
+                  <div className="h-full w-full flex flex-col items-center justify-center">
                     {imageUrl ? (
                       <img
                         src={imageUrl}
                         alt="Plant"
-                        className={`max-w-full object-contain rounded-lg shadow-md mx-auto ${isFullscreen ? 'max-h-[70vh]' : 'max-h-64'}`}
+                        className={`max-w-full object-contain rounded-lg shadow-md mx-auto ${
+                          isFullscreen 
+                            ? 'max-h-[calc(90vh-12rem)]' 
+                            : 'max-h-[calc(600px-12rem)]'
+                        }`}
                         onError={(e) => {
                           e.target.style.display = 'none';
                         }}
                       />
                     ) : (
-                      <div className={`flex items-center justify-center ${isFullscreen ? 'h-[70vh]' : 'h-64'} bg-gray-50 rounded-lg`}>
+                      <div className={`flex items-center justify-center ${
+                        isFullscreen 
+                          ? 'h-[calc(90vh-12rem)]' 
+                          : 'h-[calc(600px-12rem)]'
+                      } bg-gray-50 rounded-lg`}>
                         <p className="text-gray-500">No image available</p>
                       </div>
                     )}
                     <p className="text-gray-500 mt-4">Click to reveal scientific name</p>
                   </div>
                 ) : (
-                  <div>
-                    <h2 className={`font-bold text-green-700 mb-2 ${isFullscreen ? 'text-4xl' : 'text-2xl'}`}>
-                      {renderPlantName(currentPlant)}
-                    </h2>
-                    <p className={`text-gray-600 mb-1 ${isFullscreen ? 'text-xl' : ''}`}>
-                      Family: {currentPlant.family}
-                    </p>
-                    {currentPlant.native_to && (
-                      <p className={`text-gray-600 mb-1 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                        Native to: {currentPlant.native_to}
+                  <div className="h-full w-full flex flex-col items-center justify-center">
+                    <div className={`overflow-y-auto px-4 ${
+                      isFullscreen 
+                        ? 'max-h-[calc(90vh-12rem)]' 
+                        : 'max-h-[calc(600px-12rem)]'
+                    }`}>
+                      <h2 className={`font-bold text-green-700 mb-2 ${isFullscreen ? 'text-4xl' : 'text-2xl'}`}>
+                        {renderPlantName(currentPlant)}
+                      </h2>
+                      <p className={`text-gray-600 mb-1 ${isFullscreen ? 'text-xl' : ''}`}>
+                        Family: {currentPlant.family}
                       </p>
-                    )}
-                    {currentPlant.bloom_period && (
-                      <p className={`text-gray-600 mb-1 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                        Blooms: {currentPlant.bloom_period}
-                      </p>
-                    )}
-                    {currentPlant.description && (
-                      <p className={`text-gray-600 mt-4 max-w-md mx-auto ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                        {currentPlant.description}
-                      </p>
-                    )}
+                      {currentPlant.native_to && (
+                        <p className={`text-gray-600 mb-1 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+                          Native to: {currentPlant.native_to}
+                        </p>
+                      )}
+                      {currentPlant.bloom_period && (
+                        <p className={`text-gray-600 mb-1 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+                          Blooms: {currentPlant.bloom_period}
+                        </p>
+                      )}
+                      {currentPlant.description && (
+                        <p className={`text-gray-600 mt-4 max-w-md mx-auto ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+                          {currentPlant.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
