@@ -20,7 +20,9 @@ export function AuthProvider({ children }) {
           return;
         }
         
-        setUser(session?.user ?? null);
+        if (session?.user) {
+          setUser(session.user);
+        }
       } catch (error) {
         console.error('Error in getInitialSession:', error);
       } finally {
@@ -35,7 +37,11 @@ export function AuthProvider({ children }) {
       async (event, session) => {
         console.log('Auth state change:', event, session?.user?.id);
         
-        setUser(session?.user ?? null);
+        if (session?.user) {
+          setUser(session.user);
+        } else {
+          setUser(null);
+        }
         
         if (loading) {
           setLoading(false);
@@ -70,7 +76,7 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    // Auth state change will handle clearing user
+    setUser(null);
   };
 
   const signInWithGoogle = async () => {
@@ -92,7 +98,7 @@ export function AuthProvider({ children }) {
     signOut,
     signInWithGoogle,
     isAuthenticated: !!user,
-    supabase // Expose supabase client for other components
+    supabase
   };
 
   return (

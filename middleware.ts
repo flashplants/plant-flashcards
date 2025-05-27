@@ -30,12 +30,17 @@ export async function middleware(req: NextRequest) {
   )
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // Don't redirect if we're on the auth callback route
+  if (req.nextUrl.pathname.startsWith('/auth/callback')) {
+    return res
+  }
 
   // Check for admin access to dashboard
   if (req.nextUrl.pathname.startsWith('/dashboard')) {
-    if (!user) {
+    if (!session?.user) {
       // Not logged in - redirect to home
       const redirectUrl = new URL('/', req.url)
       redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname)
@@ -46,7 +51,7 @@ export async function middleware(req: NextRequest) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('is_admin')
-      .eq('id', user.id)
+      .eq('id', session.user.id)
       .single()
 
     if (!profile?.is_admin) {
@@ -56,7 +61,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // If user is signed in and on home page with redirect param
-  if (user && req.nextUrl.pathname === '/' && req.nextUrl.searchParams.has('redirectedFrom')) {
+  if (session?.user && req.nextUrl.pathname === '/' && req.nextUrl.searchParams.has('redirectedFrom')) {
     const redirectTo = req.nextUrl.searchParams.get('redirectedFrom')
     if (redirectTo) {
       return NextResponse.redirect(new URL(redirectTo, req.url))
@@ -67,5 +72,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/dashboard/:path*'],
+  matcher: ['/', '/dashboard/:path*', '/auth/callback'],
 } 
