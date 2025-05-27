@@ -148,6 +148,7 @@ export default function PlantFlashcardApp() {
   const [showAuth, setShowAuth] = useState(false);
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
   const [sightingsFilter, setSightingsFilter] = useState('all');
+  const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const { user, isAuthenticated } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
@@ -539,18 +540,29 @@ export default function PlantFlashcardApp() {
   const getImageUrl = (plant) => {
     if (!plant) return null;
     
-    const primaryImage = plant.plant_images?.find(img => img.is_primary);
-    const anyImage = plant.plant_images?.[0];
-    const image = primaryImage || anyImage;
+    // Get all available images
+    const images = plant.plant_images || [];
+    if (images.length === 0) return plant.image_url || null;
     
-    if (image?.path) {
-      return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${image.path}`;
+    // Randomly select an image
+    const randomImage = images[Math.floor(Math.random() * images.length)];
+    
+    if (randomImage?.path) {
+      return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${randomImage.path}`;
     }
     return plant.image_url || null;
   };
 
   // Determine which plants to display
   const displayPlants = filteredPlants.length > 0 ? filteredPlants : plants;
+
+  // Update current image URL when navigating between cards
+  useEffect(() => {
+    const currentPlant = displayPlants[currentIndex];
+    if (currentPlant) {
+      setCurrentImageUrl(getImageUrl(currentPlant));
+    }
+  }, [currentIndex, displayPlants]);
 
   // Add a function to get the count of plants for each sightings filter
   const getSightingsCount = (minSightings) => {
@@ -637,7 +649,6 @@ export default function PlantFlashcardApp() {
 
   const currentPlant = displayPlants[currentIndex];
   const progress = ((answered.size / displayPlants.length) * 100).toFixed(0);
-  const imageUrl = getImageUrl(currentPlant);
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-16 ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
@@ -815,9 +826,9 @@ export default function PlantFlashcardApp() {
               <div className="text-center w-full h-full flex items-center justify-center">
                 {!showAnswer ? (
                   <div className="h-full w-full flex flex-col items-center justify-center">
-                    {imageUrl ? (
+                    {currentImageUrl ? (
                       <img
-                        src={imageUrl}
+                        src={currentImageUrl}
                         alt="Plant"
                         className={`max-w-full object-contain rounded-lg shadow-md mx-auto ${
                           isFullscreen 
