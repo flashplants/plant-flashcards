@@ -150,6 +150,7 @@ export default function PlantFlashcardApp() {
   const [sightingsFilter, setSightingsFilter] = useState('all');
   const { user, isAuthenticated } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
 
   // Memoize fetchUserData to prevent recreation on every render
   const fetchUserData = async () => {
@@ -197,57 +198,77 @@ export default function PlantFlashcardApp() {
   useEffect(() => {
     if (plants.length === 0) return;
 
-    let filtered = [...plants];
-
-    if (selectedCollection) {
-      fetchCollectionPlants(selectedCollection);
-      return;
-    }
-
-    // Apply sightings filter first
-    if (sightingsFilter !== 'all') {
-      const minSightings = parseInt(sightingsFilter);
-      filtered = filtered.filter(plant => {
-        const sightingsCount = plant.global_sighting_counts?.[0]?.sighting_count || 0;
-        return sightingsCount >= minSightings;
-      });
-    }
-
-    // Then apply other filters
-    switch (filterMode) {
-      case 'favorites':
-        if (isAuthenticated) {
-          filtered = filtered.filter(p => favorites.has(p.id));
-        } else {
-          setShowAuth(true);
-          setFilterMode('all');
+    const applyFilters = async () => {
+      setIsFiltering(true);
+      try {
+        if (selectedCollection) {
+          await fetchCollectionPlants(selectedCollection);
           return;
         }
-        break;
-      case 'sightings':
-        if (isAuthenticated) {
-          fetchUserSightings();
-          return;
-        } else {
-          setShowAuth(true);
-          setFilterMode('all');
-          return;
-        }
-        break;
-      case 'testable':
-        if (isAuthenticated) {
-          fetchTestablePlants();
-          return;
-        } else {
-          setShowAuth(true);
-          setFilterMode('all');
-          return;
-        }
-        break;
-    }
 
-    setFilteredPlants(filtered);
-  }, [filterMode, selectedCollection, favorites, plants, isAuthenticated, sightingsFilter]);
+        let filtered = [...plants];
+
+        // Apply sightings filter first
+        if (sightingsFilter !== 'all') {
+          const minSightings = parseInt(sightingsFilter);
+          filtered = filtered.filter(plant => {
+            const sightingsCount = plant.global_sighting_counts?.[0]?.sighting_count || 0;
+            return sightingsCount >= minSightings;
+          });
+        }
+
+        // Then apply other filters
+        switch (filterMode) {
+          case 'favorites':
+            if (isAuthenticated) {
+              filtered = filtered.filter(p => favorites.has(p.id));
+            } else {
+              setShowAuth(true);
+              setFilterMode('all');
+              return;
+            }
+            break;
+          case 'sightings':
+            if (isAuthenticated) {
+              await fetchUserSightings();
+              return;
+            } else {
+              setShowAuth(true);
+              setFilterMode('all');
+              return;
+            }
+            break;
+          case 'testable':
+            if (isAuthenticated) {
+              await fetchTestablePlants();
+              return;
+            } else {
+              setShowAuth(true);
+              setFilterMode('all');
+              return;
+            }
+            break;
+        }
+
+        setFilteredPlants(filtered);
+      } catch (error) {
+        console.error('Error applying filters:', error);
+        setError('Failed to apply filters');
+      } finally {
+        setIsFiltering(false);
+      }
+    };
+
+    applyFilters();
+  }, [filterMode, selectedCollection, plants, isAuthenticated, sightingsFilter]);
+
+  // Separate effect for favorites to prevent unnecessary re-filtering
+  useEffect(() => {
+    if (filterMode === 'favorites' && isAuthenticated) {
+      const filtered = plants.filter(p => favorites.has(p.id));
+      setFilteredPlants(filtered);
+    }
+  }, [favorites, filterMode, isAuthenticated, plants]);
 
   // Fetch user data when user changes
   useEffect(() => {
@@ -295,59 +316,58 @@ export default function PlantFlashcardApp() {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...plants];
-
-    if (selectedCollection) {
-      // Filter by collection
-      fetchCollectionPlants(selectedCollection);
-      return;
-    }
-
-    switch (filterMode) {
-      case 'favorites':
-        filtered = plants.filter(p => favorites.has(p.id));
-        break;
-      case 'sightings':
-        if (user) {
-          fetchUserSightings();
-          return;
-        }
-        break;
-      case 'testable':
-        if (user) {
-          fetchTestablePlants();
-          return;
-        }
-        break;
-    }
-
-    // Only update if the filtered plants are different
-    if (JSON.stringify(filtered) !== JSON.stringify(filteredPlants)) {
-      setFilteredPlants(shuffleArray(filtered));
-    }
-  };
-
   const fetchCollectionPlants = async (collectionId) => {
-    const { data } = await supabase
-      .from('collection_plants')
-      .select(`
-        plant_id,
-        plants (
-          *,
-          plant_images (
-            id,
-            path,
-            is_primary
+    setIsFiltering(true);
+    try {
+      const { data, error } = await supabase
+        .from('collection_plants')
+        .select(`
+          plant_id,
+          plants (
+            *,
+            plant_images (
+              id,
+              path,
+              is_primary
+            ),
+            global_sighting_counts (
+              sighting_count
+            )
           )
-        )
-      `)
-      .eq('collection_id', collectionId)
-      .eq('plants.is_published', true);
+        `)
+        .eq('collection_id', collectionId)
+        .eq('plants.is_published', true);
 
-    if (data) {
-      const collectionPlants = data.map(cp => cp.plants).filter(Boolean);
-      setFilteredPlants(shuffleArray(collectionPlants));
+      if (error) throw error;
+
+      if (data) {
+        // Safely process the plants data
+        const collectionPlants = data
+          .map(cp => {
+            if (!cp.plants) return null;
+            return {
+              ...cp.plants,
+              sightings_count: cp.plants.global_sighting_counts?.[0]?.sighting_count || 0
+            };
+          })
+          .filter(Boolean);
+
+        // Apply sightings filter if active
+        let filtered = collectionPlants;
+        if (sightingsFilter !== 'all') {
+          const minSightings = parseInt(sightingsFilter);
+          filtered = collectionPlants.filter(plant => 
+            (plant.sightings_count || 0) >= minSightings
+          );
+        }
+
+        setFilteredPlants(shuffleArray(filtered));
+      }
+    } catch (error) {
+      console.error('Error fetching collection plants:', error);
+      setError('Failed to load collection plants');
+    } finally {
+      setIsFiltering(false);
     }
   };
 
@@ -567,7 +587,7 @@ export default function PlantFlashcardApp() {
     };
   }, []);
 
-  if (loading) {
+  if (loading || isFiltering) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-green-50">
         <div className="text-center">
