@@ -39,7 +39,10 @@ import {
   Check,
   ChevronsUpDown,
   Filter,
-  Search
+  Search,
+  FolderPlus,
+  FolderEdit,
+  FolderMinus
 } from 'lucide-react';
 
 // Helper function to convert image to WebP
@@ -219,6 +222,13 @@ function DashboardContent() {
     is_published: null,
     collection_id: null
   });
+  const [showCollections, setShowCollections] = useState(false);
+  const [editingCollection, setEditingCollection] = useState(null);
+  const [newCollection, setNewCollection] = useState({
+    name: '',
+    description: '',
+    is_published: false
+  });
 
   // Pagination state from URL
   const searchParams = useSearchParams();
@@ -316,9 +326,16 @@ function DashboardContent() {
     const fetchCollections = async () => {
       const { data, error } = await supabase
         .from('collections')
-        .select('id, name')
+        .select('id, name, description, is_published, user_id')
         .order('name');
-      if (!error && data) setCollections(data);
+      if (!error && data) {
+        // Ensure all collections have the correct boolean value for is_published
+        const formattedCollections = data.map(collection => ({
+          ...collection,
+          is_published: Boolean(collection.is_published)
+        }));
+        setCollections(formattedCollections);
+      }
     };
     fetchCollections();
   }, []);
@@ -825,6 +842,99 @@ function DashboardContent() {
     }
   };
 
+  const handleCreateCollection = async () => {
+    try {
+      if (!newCollection.name.trim()) {
+        alert('Collection name is required');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('collections')
+        .insert([{
+          ...newCollection,
+          is_published: Boolean(newCollection.is_published),
+          user_id: authUser.id
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Ensure the new collection has the correct boolean value
+      const formattedCollection = {
+        ...data,
+        is_published: Boolean(data.is_published)
+      };
+
+      setCollections(prev => [...prev, formattedCollection]);
+      setNewCollection({
+        name: '',
+        description: '',
+        is_published: false
+      });
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleEditCollection = async (collection) => {
+    try {
+      if (!collection.name.trim()) {
+        alert('Collection name is required');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('collections')
+        .update({
+          name: collection.name,
+          description: collection.description || '',
+          is_published: Boolean(collection.is_published)
+        })
+        .eq('id', collection.id);
+
+      if (error) throw error;
+
+      // Ensure the updated collection has the correct boolean value
+      const formattedCollection = {
+        ...collection,
+        is_published: Boolean(collection.is_published)
+      };
+
+      setCollections(prev => prev.map(c => 
+        c.id === collection.id ? formattedCollection : c
+      ));
+      setEditingCollection(null);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteCollection = async (collectionId) => {
+    if (!confirm('Are you sure you want to delete this collection? This will also remove all plant associations.')) return;
+
+    try {
+      // First delete all plant associations
+      await supabase
+        .from('collection_plants')
+        .delete()
+        .eq('collection_id', collectionId);
+
+      // Then delete the collection
+      const { error } = await supabase
+        .from('collections')
+        .delete()
+        .eq('id', collectionId);
+
+      if (error) throw error;
+
+      setCollections(prev => prev.filter(c => c.id !== collectionId));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -870,7 +980,169 @@ function DashboardContent() {
 
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Plants Dashboard</h1>
+            <div className="flex justify-between items-center mb-4">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Plants Dashboard</h1>
+              <Button
+                onClick={() => setShowCollections(!showCollections)}
+                className="flex items-center gap-2"
+              >
+                {showCollections ? (
+                  <>
+                    <FolderMinus className="w-5 h-5" />
+                    Hide Collections
+                  </>
+                ) : (
+                  <>
+                    <FolderPlus className="w-5 h-5" />
+                    Manage Collections
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Collections Management Section */}
+            {showCollections && (
+              <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Collections</h2>
+                
+                {/* New Collection Form */}
+                <div className="mb-6 p-4 border rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Create New Collection</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="collection-name">Name</Label>
+                      <Input
+                        id="collection-name"
+                        value={newCollection.name}
+                        onChange={(e) => setNewCollection(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Enter collection name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="collection-description">Description</Label>
+                      <Textarea
+                        id="collection-description"
+                        value={newCollection.description}
+                        onChange={(e) => setNewCollection(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Enter collection description"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="collection-published"
+                        checked={newCollection.is_published}
+                        onChange={(e) => setNewCollection(prev => ({ ...prev, is_published: e.target.checked }))}
+                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                      />
+                      <Label htmlFor="collection-published">Published</Label>
+                    </div>
+                    <Button
+                      onClick={handleCreateCollection}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      Create Collection
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Collections List */}
+                <div className="space-y-4">
+                  {collections.map(collection => (
+                    <div key={collection.id} className="border rounded-lg p-4">
+                      {editingCollection?.id === collection.id ? (
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor={`edit-name-${collection.id}`}>Name</Label>
+                            <Input
+                              id={`edit-name-${collection.id}`}
+                              value={editingCollection.name || ''}
+                              onChange={(e) => setEditingCollection(prev => ({ ...prev, name: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`edit-description-${collection.id}`}>Description</Label>
+                            <Textarea
+                              id={`edit-description-${collection.id}`}
+                              value={editingCollection.description || ''}
+                              onChange={(e) => setEditingCollection(prev => ({ ...prev, description: e.target.value }))}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`edit-published-${collection.id}`}
+                              checked={editingCollection.is_published || false}
+                              onChange={(e) => setEditingCollection(prev => ({ ...prev, is_published: e.target.checked }))}
+                              className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            />
+                            <Label htmlFor={`edit-published-${collection.id}`}>Published</Label>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => setEditingCollection(null)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => handleEditCollection(editingCollection)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              Save Changes
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-lg font-medium text-gray-900">{collection.name}</h3>
+                            {collection.description && (
+                              <p className="text-gray-600 mt-1">{collection.description}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                collection.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {collection.is_published ? 'Published' : 'Draft'}
+                              </span>
+                              {collection.user_id === authUser?.id && (
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                  My Collection
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditingCollection({
+                                ...collection,
+                                name: collection.name || '',
+                                description: collection.description || '',
+                                is_published: collection.is_published || false
+                              })}
+                            >
+                              <FolderEdit className="w-5 h-5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCollection(collection.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full">
               {/* Search Bar */}
               <div className="flex-1 relative">
