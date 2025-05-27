@@ -67,45 +67,95 @@ const generateSuffix = () => {
 };
 
 function buildFullPlantName(plant) {
-  // Remove punctuation and join all relevant fields
-  const clean = (str) => str ? str.replace(/[^a-zA-Z0-9-]/g, '') : '';
-  
   // Build the name parts array
   let nameParts = [];
   
-  // Add hybrid marker based on position
+  // Add hybrid marker based on position (never italicized)
   if (plant.hybrid_marker === 'x') {
     if (plant.hybrid_marker_position === 'before_genus') {
-      nameParts.push('x');
+      nameParts.push({ text: 'x', italic: false });
     }
   }
   
-  // Add genus
-  nameParts.push(plant.genus);
-  
-  // Add hybrid marker if it should be between genus and species
-  if (plant.hybrid_marker === 'x' && plant.hybrid_marker_position === 'between_genus_species') {
-    nameParts.push('x');
+  // Add genus (italic)
+  if (plant.genus) {
+    nameParts.push({ text: plant.genus, italic: true });
   }
   
-  // Add remaining parts
-  nameParts = nameParts.concat([
-    plant.specific_epithet,
-    plant.infraspecies_rank,
-    plant.infraspecies_epithet,
-    plant.variety
-  ]);
+  // Add hybrid marker if it should be between genus and species (never italicized)
+  if (plant.hybrid_marker === 'x' && plant.hybrid_marker_position === 'between_genus_species') {
+    nameParts.push({ text: 'x', italic: false });
+  }
+  
+  // Add specific epithet (italic)
+  if (plant.specific_epithet) {
+    nameParts.push({ text: plant.specific_epithet, italic: true });
+  }
+
+  // Add infraspecies rank and epithet if they exist
+  if (plant.infraspecies_rank && plant.infraspecies_epithet) {
+    // Convert subsp. to ssp.
+    const rank = plant.infraspecies_rank === 'subsp.' ? 'ssp.' : plant.infraspecies_rank;
+    nameParts.push({ text: rank, italic: false });
+    nameParts.push({ text: plant.infraspecies_epithet, italic: true });
+  }
+
+  // Add variety if it exists
+  if (plant.variety) {
+    nameParts.push({ text: 'var.', italic: false });
+    nameParts.push({ text: plant.variety, italic: true });
+  }
 
   // Add cultivar with single quotes if it exists
   if (plant.cultivar) {
-    nameParts.push(`'${plant.cultivar}'`);
+    nameParts.push({ text: `'${plant.cultivar}'`, italic: false });
   }
+
+  // Build the final string with proper spacing and commas
+  let result = [];
   
-  return nameParts
-    .map(clean)
-    .filter(Boolean)
-    .join(' ');
+  // Add the scientific name parts with proper italicization
+  let scientificNameParts = nameParts.map(part => {
+    if (typeof part === 'string') {
+      return part;
+    }
+    return part.italic ? `<i>${part.text}</i>` : part.text;
+  });
+  result.push({ text: scientificNameParts.join(' '), italic: false });
+
+  // Add common name if it exists
+  if (plant.common_name) {
+    result.push(plant.common_name);
+  }
+
+  // Add family if it exists
+  if (plant.family) {
+    result.push({ text: plant.family, italic: true });
+  }
+
+  return result;
 }
+
+// Update where the plant name is displayed to handle the new format
+const renderPlantName = (plant) => {
+  const parts = buildFullPlantName(plant);
+  return parts.map((part, index) => (
+    <span key={index}>
+      {typeof part === 'string' ? (
+        <>
+          {part}
+          {index < parts.length - 1 ? ',' : ''}
+        </>
+      ) : (
+        <>
+          <span dangerouslySetInnerHTML={{ __html: part.text }} />
+          {index < parts.length - 1 ? ',' : ''}
+        </>
+      )}
+      {index < parts.length - 1 ? ' ' : ''}
+    </span>
+  ));
+};
 
 // Helper to get unique collection labels
 const getCollectionLabel = (col, allCollections) => {
@@ -972,7 +1022,7 @@ function DashboardContent() {
                       {plant.plant_images?.[0] ? (
                         <img
                           src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[0].path}`}
-                          alt={buildFullPlantName(plant)}
+                          alt={renderPlantName(plant).join(' ')}
                           className="w-full h-full object-cover rounded-lg"
                         />
                       ) : (
@@ -990,21 +1040,14 @@ function DashboardContent() {
                           <CardContent className="p-0 space-y-4">
                             <div className="border-b pb-4">
                               <h3 className="text-xl font-semibold text-gray-900">
-                                {buildFullPlantName(editingPlant)}
+                                {renderPlantName(editingPlant)}
                               </h3>
                               <p className="text-sm text-gray-500 mt-1">
                                 Edit plant details below
                               </p>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="common_name">Common Name</Label>
-                                <Input
-                                  id="common_name"
-                                  value={editingPlant.common_name || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, common_name: e.target.value })}
-                                />
-                              </div>
+                              {/* Scientific Name Fields */}
                               <div className="space-y-2">
                                 <Label htmlFor="genus" className="flex items-center gap-1">
                                   Genus
@@ -1020,30 +1063,6 @@ function DashboardContent() {
                                 {!editingPlant.genus && (
                                   <p className="text-sm text-red-500">Genus is required</p>
                                 )}
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="family" className="flex items-center gap-1">
-                                  Family
-                                  <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                  id="family"
-                                  value={editingPlant.family || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, family: e.target.value })}
-                                  required
-                                  className={!editingPlant.family ? "border-red-300 focus:ring-red-500" : ""}
-                                />
-                                {!editingPlant.family && (
-                                  <p className="text-sm text-red-500">Family is required</p>
-                                )}
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="species">Species</Label>
-                                <Input
-                                  id="species"
-                                  value={editingPlant.species || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, species: e.target.value })}
-                                />
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="specific_epithet">Specific Epithet</Label>
@@ -1094,7 +1113,7 @@ function DashboardContent() {
                                   <option value="">None</option>
                                   <option value="f.">f.</option>
                                   <option value="var.">var.</option>
-                                  <option value="spp.">spp.</option>
+                                  <option value="subsp.">subsp.</option>
                                   <option value="ssp.">ssp.</option>
                                   <option value="Purpureus Group">Purpureus Group</option>
                                 </select>
@@ -1105,14 +1124,6 @@ function DashboardContent() {
                                   id="infraspecies_epithet"
                                   value={editingPlant.infraspecies_epithet || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_epithet: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="subspecies">Subspecies</Label>
-                                <Input
-                                  id="subspecies"
-                                  value={editingPlant.subspecies || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, subspecies: e.target.value })}
                                 />
                               </div>
                               <div className="space-y-2">
@@ -1131,6 +1142,34 @@ function DashboardContent() {
                                   onChange={(e) => setEditingPlant({ ...editingPlant, cultivar: e.target.value })}
                                 />
                               </div>
+
+                              {/* Common Name and Family */}
+                              <div className="space-y-2">
+                                <Label htmlFor="common_name">Common Name</Label>
+                                <Input
+                                  id="common_name"
+                                  value={editingPlant.common_name || ''}
+                                  onChange={(e) => setEditingPlant({ ...editingPlant, common_name: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="family" className="flex items-center gap-1">
+                                  Family
+                                  <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                  id="family"
+                                  value={editingPlant.family || ''}
+                                  onChange={(e) => setEditingPlant({ ...editingPlant, family: e.target.value })}
+                                  required
+                                  className={!editingPlant.family ? "border-red-300 focus:ring-red-500" : ""}
+                                />
+                                {!editingPlant.family && (
+                                  <p className="text-sm text-red-500">Family is required</p>
+                                )}
+                              </div>
+
+                              {/* Additional Information */}
                               <div className="space-y-2">
                                 <Label htmlFor="native_to">Native To</Label>
                                 <Input
@@ -1197,7 +1236,7 @@ function DashboardContent() {
                               <Label className="text-base font-semibold mb-4 block">Plant Images</Label>
                               <PlantImageManager
                                 plantId={editingPlant.id}
-                                plantName={buildFullPlantName(editingPlant)}
+                                plantName={renderPlantName(editingPlant)}
                                 genus={editingPlant.genus}
                                 specific_epithet={editingPlant.specific_epithet}
                                 infraspecies_rank={editingPlant.infraspecies_rank}
@@ -1227,7 +1266,7 @@ function DashboardContent() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <h3 className="text-lg font-semibold text-gray-900">
-                              {buildFullPlantName(plant)}
+                              {renderPlantName(plant)}
                             </h3>
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                               plant.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
