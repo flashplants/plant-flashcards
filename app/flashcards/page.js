@@ -490,6 +490,8 @@ export default function PlantFlashcardApp() {
   };
 
   const getImageUrl = (plant) => {
+    if (!plant) return null;
+    
     const primaryImage = plant.plant_images?.find(img => img.is_primary);
     const anyImage = plant.plant_images?.[0];
     const image = primaryImage || anyImage;
@@ -718,7 +720,9 @@ export default function PlantFlashcardApp() {
                         }}
                       />
                     ) : (
-                      <p className="text-gray-500">No image available</p>
+                      <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500">No image available</p>
+                      </div>
                     )}
                     <p className="text-gray-500 mt-4">Click to reveal scientific name</p>
                   </div>
