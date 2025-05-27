@@ -22,6 +22,44 @@ import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
 
+// Helper function to build full plant name
+function buildFullPlantName(plant) {
+  // Remove punctuation and join all relevant fields
+  const clean = (str) => str ? str.replace(/[^a-zA-Z0-9-]/g, '') : '';
+  
+  // Build the name parts array
+  let nameParts = [];
+  
+  // Add hybrid marker based on position
+  if (plant.hybrid_marker) {
+    if (plant.hybrid_marker_position === 'before_genus') {
+      nameParts.push(plant.hybrid_marker);
+    }
+  }
+  
+  // Add genus
+  nameParts.push(plant.genus);
+  
+  // Add hybrid marker if it should be between genus and species
+  if (plant.hybrid_marker && plant.hybrid_marker_position === 'between_genus_species') {
+    nameParts.push(plant.hybrid_marker);
+  }
+  
+  // Add remaining parts
+  nameParts = nameParts.concat([
+    plant.specific_epithet,
+    plant.infraspecies_rank,
+    plant.infraspecies_epithet,
+    plant.variety,
+    plant.cultivar
+  ]);
+  
+  return nameParts
+    .map(clean)
+    .filter(Boolean)
+    .join(' ');
+}
+
 // Debounce function
 const debounce = (func, wait) => {
   let timeout;
@@ -618,7 +656,7 @@ export default function PlantFlashcardApp() {
                 ) : (
                   <div>
                     <h2 className="text-2xl font-bold text-green-700 mb-2">
-                      {currentPlant.scientific_name}
+                      {buildFullPlantName(currentPlant)}
                     </h2>
                     <p className="text-gray-600 mb-1">
                       Family: {currentPlant.family}
