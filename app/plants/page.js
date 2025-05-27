@@ -10,84 +10,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Star, Leaf } from 'lucide-react';
 import { Button } from "../../components/ui/button";
-
-// Reuse the buildFullPlantName and renderPlantName functions from dashboard
-function buildFullPlantName(plant) {
-  let nameParts = [];
-  
-  if (plant.hybrid_marker === 'x') {
-    if (plant.hybrid_marker_position === 'before_genus') {
-      nameParts.push({ text: 'x', italic: false });
-    }
-  }
-  
-  if (plant.genus) {
-    nameParts.push({ text: plant.genus, italic: true });
-  }
-  
-  if (plant.hybrid_marker === 'x' && plant.hybrid_marker_position === 'between_genus_species') {
-    nameParts.push({ text: 'x', italic: false });
-  }
-  
-  if (plant.specific_epithet) {
-    nameParts.push({ text: plant.specific_epithet, italic: true });
-  }
-
-  if (plant.infraspecies_rank && plant.infraspecies_epithet) {
-    const rank = plant.infraspecies_rank === 'subsp.' ? 'ssp.' : plant.infraspecies_rank;
-    nameParts.push({ text: rank, italic: false });
-    nameParts.push({ text: plant.infraspecies_epithet, italic: true });
-  }
-
-  if (plant.variety) {
-    nameParts.push({ text: 'var.', italic: false });
-    nameParts.push({ text: plant.variety, italic: true });
-  }
-
-  if (plant.cultivar) {
-    nameParts.push({ text: `'${plant.cultivar}'`, italic: false });
-  }
-
-  let result = [];
-  
-  let scientificNameParts = nameParts.map(part => {
-    if (typeof part === 'string') {
-      return part;
-    }
-    return part.italic ? `<i>${part.text}</i>` : part.text;
-  });
-  result.push({ text: scientificNameParts.join(' '), italic: false });
-
-  if (plant.common_name) {
-    result.push(plant.common_name);
-  }
-
-  if (plant.family) {
-    result.push({ text: plant.family, italic: true });
-  }
-
-  return result;
-}
-
-const renderPlantName = (plant) => {
-  const parts = buildFullPlantName(plant);
-  return parts.map((part, index) => (
-    <span key={index}>
-      {typeof part === 'string' ? (
-        <>
-          {part}
-          {index < parts.length - 1 ? ',' : ''}
-        </>
-      ) : (
-        <>
-          <span dangerouslySetInnerHTML={{ __html: part.italic ? `<i>${part.text}</i>` : part.text }} />
-          {index < parts.length - 1 ? ',' : ''}
-        </>
-      )}
-      {index < parts.length - 1 ? ' ' : ''}
-    </span>
-  ));
-};
+import { buildFullPlantName, renderPlantName } from '../utils/plantNameUtils';
 
 export default function PlantsPage() {
   const [plants, setPlants] = useState([]);
@@ -251,9 +174,9 @@ export default function PlantsPage() {
                 </Button>
               </div>
               <CardContent className="p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <div className="flex items-center space-x-2">
                   {renderPlantName(plant)}
-                </h3>
+                </div>
                 {plant.common_name && (
                   <p className="text-sm text-gray-600 mb-3">{plant.common_name}</p>
                 )}
