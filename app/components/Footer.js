@@ -54,18 +54,6 @@ export default function Footer() {
             <span className="text-xs font-medium">Home</span>
           </Link>
           <Link
-            href="/dashboard"
-            onClick={handleDashboardClick}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-              pathname === '/dashboard'
-                ? 'text-green-600 bg-green-50'
-                : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-            }`}
-          >
-            <CircleGauge className="w-5 h-5" />
-            <span className="text-xs font-medium">Dashboard</span>
-          </Link>
-          <Link
             href="/flashcards"
             className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
               pathname === '/flashcards'
@@ -75,6 +63,18 @@ export default function Footer() {
           >
             <GalleryHorizontalEnd className="w-5 h-5" />
             <span className="text-xs font-medium">Flashcards</span>
+          </Link>
+          <Link
+            href="/dashboard"
+            onClick={handleDashboardClick}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              pathname === '/dashboard'
+                ? 'text-green-600 bg-green-50'
+                : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+            }`}
+          >
+            <CircleGauge className="w-5 h-5" />
+            <span className="text-xs font-medium">Admin Dashboard</span>
           </Link>
         </div>
       </nav>
