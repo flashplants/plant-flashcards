@@ -318,7 +318,8 @@ export default function PlantFlashcardApp() {
           )
         )
       `)
-      .eq('collection_id', collectionId);
+      .eq('collection_id', collectionId)
+      .eq('plants.is_published', true);
 
     if (data) {
       const collectionPlants = data.map(cp => cp.plants).filter(Boolean);
@@ -340,7 +341,8 @@ export default function PlantFlashcardApp() {
           )
         )
       `)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('plants.is_published', true);
 
     if (data) {
       const sightingPlants = data.map(s => s.plants).filter(Boolean);
@@ -363,7 +365,8 @@ export default function PlantFlashcardApp() {
         )
       `)
       .eq('user_id', user.id)
-      .eq('is_testable', true);
+      .eq('is_testable', true)
+      .eq('plants.is_published', true);
 
     if (data) {
       const testPlants = data.map(s => s.plants).filter(Boolean);
