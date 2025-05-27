@@ -178,7 +178,7 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
       updateFileStatus(fileObj.id, 'uploading', 80);
 
       // Set as primary if this is the first image
-      const isPrimary = existingImages.length === 0 && newFiles.filter(f => f.status === 'completed').length === 0;
+      const isPrimary = existingImages.length === 0;
 
       const { error: dbError } = await supabase
         .from('plant_images')
@@ -204,20 +204,15 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
   // Upload all pending files
   const uploadAllFiles = async () => {
     setUploading(true);
-    
     const pendingFiles = newFiles.filter(file => file.status === 'pending');
-    
-    for (let i = 0; i < pendingFiles.length; i += 2) {
-      const batch = pendingFiles.slice(i, i + 2);
-      await Promise.all(batch.map(file => uploadFile(file)));
+    for (let i = 0; i < pendingFiles.length; i++) {
+      await uploadFile(pendingFiles[i]);
+      await loadExistingImages(); // Ensure existingImages is up to date for next upload
     }
-
     setUploading(false);
     await loadExistingImages(); // Refresh existing images
-    
     // Remove completed files from new files
     setNewFiles(prev => prev.filter(f => f.status !== 'completed'));
-    
     if (onImagesChange) {
       onImagesChange();
     }

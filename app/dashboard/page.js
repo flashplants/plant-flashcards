@@ -1,11 +1,24 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { debounce } from 'lodash';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { cn } from '../../lib/utils';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 import PlantImageManager from '../components/PlantImageManager';
 import BulkImageUpload from '../components/BulkImageUpload';
+import AuthModal from '../components/AuthModal';
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Button } from "../../components/ui/button";
+import { Label } from "../../components/ui/label";
+import { Card, CardContent } from "../../components/ui/card";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../../components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
+import { Badge } from "../../components/ui/badge";
 import {
   AlertCircle,
   CheckCircle,
@@ -16,21 +29,18 @@ import {
   Upload,
   X,
   Plus,
+  Minus,
   Edit,
   Save,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Check,
+  ChevronsUpDown,
+  Filter,
+  Search
 } from 'lucide-react';
-import Header from '../components/Header';
-import AuthModal from '../components/AuthModal';
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import Footer from '../components/Footer';
 
 // Helper function to convert image to WebP
 const convertToWebP = async (file) => {
@@ -72,6 +82,17 @@ function buildFullPlantName(plant) {
     .join(' ');
 }
 
+// Helper to get unique collection labels
+const getCollectionLabel = (col, allCollections) => {
+  const nameCount = allCollections.filter(c => c.name === col.name).length;
+  return nameCount > 1 ? `${col.name} (ID: ${col.id})` : col.name;
+};
+
+const getCollectionName = (id, allCollections) => {
+  const col = allCollections.find(c => c.id === id);
+  return col ? col.name : 'Collection';
+};
+
 export default function PlantsDashboard() {
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,13 +128,28 @@ export default function PlantsDashboard() {
   const [favorites, setFavorites] = useState(new Set());
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const { user: authUser } = useAuth();
   const router = useRouter();
+  const [globalSightings, setGlobalSightings] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [selectedFilters, setSelectedFilters] = useState({
+    is_published: null,
+    collection_id: null
+  });
+
+  // Pagination state from URL
+  const searchParams = useSearchParams();
+  const initialPage = parseInt(searchParams.get('page') || '1', 10);
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const pathname = usePathname();
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -130,10 +166,11 @@ export default function PlantsDashboard() {
         }
         setIsAdmin(true);
         fetchPlants();
+        setLoading(false);
+        return;
       }
       setLoading(false);
     };
-
     checkAdminStatus();
   }, [authUser, router]);
 
@@ -155,8 +192,157 @@ export default function PlantsDashboard() {
     }
   };
 
+  // Fetch global sightings counts for all plants on page
+  const fetchGlobalSightings = useCallback(async (plantIds) => {
+    if (!plantIds.length) return;
+    const { data, error } = await supabase
+      .from('global_sighting_counts')
+      .select('plant_id, sighting_count')
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      data.forEach(row => {
+        counts[row.plant_id] = row.sighting_count;
+      });
+      setGlobalSightings(counts);
+    }
+  }, []);
+
+  // Fetch suggestions
+  const fetchSuggestions = async (query) => {
+    if (!query.trim()) {
+      setSuggestions([]);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('plants')
+      .select('scientific_name, common_name, genus, family')
+      .or(`scientific_name.ilike.%${query}%,common_name.ilike.%${query}%,genus.ilike.%${query}%`)
+      .limit(5);
+
+    setSuggestions(data || []);
+  };
+
+  // Debounced suggestion fetch
+  const debouncedFetchSuggestions = useCallback(
+    debounce(fetchSuggestions, 200),
+    []
+  );
+
+  // Update search when query changes
+  useEffect(() => {
+    debouncedFetchSuggestions(searchQuery);
+    return () => debouncedFetchSuggestions.cancel();
+  }, [searchQuery, debouncedFetchSuggestions]);
+
+  // Fetch collections for filter
+  useEffect(() => {
+    const fetchCollections = async () => {
+      const { data, error } = await supabase
+        .from('collections')
+        .select('id, name')
+        .order('name');
+      if (!error && data) setCollections(data);
+    };
+    fetchCollections();
+  }, []);
+
+  // Modify the search function to include filters
+  const debouncedSearch = useCallback(
+    debounce(async (query) => {
+      const trimmed = query.trim();
+      // Always re-run filter logic when search is cleared
+      if (!trimmed) {
+        fetchPlants();
+        return;
+      }
+      setIsSearching(true);
+      try {
+        let queryBuilder = supabase
+          .from('plants')
+          .select(`
+            *,
+            plant_images (
+              id,
+              path,
+              is_primary
+            )
+          `);
+        // Improved search logic
+        const words = trimmed.split(/\s+/).filter(Boolean);
+        if (trimmed) {
+          if (words.length < 2) {
+            // Partial match for any single word or partial input
+            queryBuilder = queryBuilder.or(`scientific_name.ilike.%${trimmed}%,common_name.ilike.%${trimmed}%,genus.ilike.%${trimmed}%`);
+          } else {
+            // Full-text search for multi-word
+            queryBuilder = queryBuilder.textSearch('search_vector', trimmed, {
+              type: 'websearch',
+              config: 'english'
+            });
+          }
+        }
+        // Add filters
+        if (selectedFilters.is_published !== null) {
+          queryBuilder = queryBuilder.eq('is_published', selectedFilters.is_published);
+        }
+        if (selectedFilters.collection_id) {
+          // Filter by collection using collection_plants join
+          const { data: cpData, error: cpError } = await supabase
+            .from('collection_plants')
+            .select('plant_id')
+            .eq('collection_id', selectedFilters.collection_id);
+          if (cpError) throw cpError;
+          const plantIds = cpData.map(cp => cp.plant_id);
+          setTotalCount(plantIds.length);
+          setTotalPages(Math.ceil(plantIds.length / pageSize));
+          const pagedPlantIds = plantIds.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+          if (pagedPlantIds.length > 0) {
+            queryBuilder = queryBuilder.in('id', pagedPlantIds);
+          } else {
+            setPlants([]);
+            setGlobalSightings({});
+            setTotalCount(0);
+            setTotalPages(1);
+            setIsSearching(false);
+            return;
+          }
+        }
+        const { data, error } = await queryBuilder.order('scientific_name');
+        if (error) throw error;
+        setPlants(data || []);
+        setTotalCount(data?.length || 0);
+        setTotalPages(Math.ceil((data?.length || 0) / pageSize));
+        if (data && data.length) {
+          fetchGlobalSightings(data.map(p => p.id));
+        } else {
+          setGlobalSightings({});
+        }
+      } catch (err) {
+        console.error('Search error:', err);
+        setError(err.message);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300),
+    [selectedFilters]
+  );
+
+  // Update search when query changes
+  useEffect(() => {
+    debouncedSearch(searchQuery);
+    return () => debouncedSearch.cancel();
+  }, [searchQuery, debouncedSearch]);
+
+  // Modify fetchPlants to handle search
   const fetchPlants = async () => {
     try {
+      if (searchQuery.trim()) {
+        await debouncedSearch(searchQuery);
+        return;
+      }
+
       // First, get the total count
       const { count, error: countError } = await supabase
         .from('plants')
@@ -183,6 +369,12 @@ export default function PlantsDashboard() {
       if (error) throw error;
       setPlants(data || []);
       setLoading(false);
+      // Fetch global sightings for these plants
+      if (data && data.length) {
+        fetchGlobalSightings(data.map(p => p.id));
+      } else {
+        setGlobalSightings({});
+      }
     } catch (err) {
       setError(err.message);
       setLoading(false);
@@ -192,6 +384,14 @@ export default function PlantsDashboard() {
   useEffect(() => {
     fetchPlants();
   }, [currentPage, pageSize]);
+
+  useEffect(() => {
+    // Update the URL with the current page (without reload)
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.set('page', currentPage);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line
+  }, [currentPage]);
 
   const handleEdit = (plant) => {
     setEditingPlant({ ...plant });
@@ -408,6 +608,45 @@ export default function PlantsDashboard() {
     );
   };
 
+  // Increment/decrement global sightings
+  const updateGlobalSighting = async (plantId, delta) => {
+    const current = globalSightings[plantId] || 0;
+    const newCount = Math.max(0, current + delta);
+    setGlobalSightings(prev => ({ ...prev, [plantId]: newCount })); // Optimistic
+    let error = null;
+    if (delta > 0) {
+      // Insert a new row into global_sightings
+      ({ error } = await supabase
+        .from('global_sightings')
+        .insert({ plant_id: plantId }));
+    } else if (delta < 0 && current > 0) {
+      // Delete one row for this plant_id (the oldest)
+      // Get the oldest id for this plant
+      const { data: rows, error: fetchError } = await supabase
+        .from('global_sightings')
+        .select('id')
+        .eq('plant_id', plantId)
+        .order('id', { ascending: true })
+        .limit(1);
+      if (!fetchError && rows && rows.length > 0) {
+        const rowId = rows[0].id;
+        ({ error } = await supabase
+          .from('global_sightings')
+          .delete()
+          .eq('id', rowId));
+      } else {
+        error = fetchError || new Error('No global sighting row to delete');
+      }
+    }
+    // Always re-fetch counts after change
+    await fetchGlobalSightings(plants.map(p => p.id));
+    if (error) {
+      // Revert on error
+      setGlobalSightings(prev => ({ ...prev, [plantId]: current }));
+      alert('Failed to update global sightings: ' + (error.message || error));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -416,7 +655,7 @@ export default function PlantsDashboard() {
     );
   }
 
-  if (!isAdmin) {
+  if (!loading && !isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -464,170 +703,142 @@ export default function PlantsDashboard() {
         />
 
         <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Plants Dashboard</h1>
-              {user && (
-                <button
-                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                    showFavoritesOnly 
-                      ? 'bg-red-100 text-red-800 hover:bg-red-200' 
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                  }`}
-                >
-                  <Star className={`w-5 h-5 ${showFavoritesOnly ? 'fill-red-400' : ''}`} />
-                  {showFavoritesOnly ? 'Show All' : 'Show Favorites'}
-                </button>
+          <div className="mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Plants Dashboard</h1>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full">
+              {/* Search Bar */}
+              <div className="flex-1 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Search className="w-5 h-5" />
+                </span>
+                <Input
+                  type="text"
+                  placeholder="Search plants..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="h-12 pl-10 pr-4 text-base w-full bg-white"
+                />
+              </div>
+              {/* Filters Button */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="h-12 w-full sm:w-[140px] flex items-center justify-between px-4 text-base"
+                  >
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filters
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-4">
+                  <div className="space-y-4">
+                    {/* Published Status Filter */}
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Published Status</h4>
+                      <div className="flex gap-2">
+                        <Badge
+                          variant={selectedFilters.is_published === true ? "default" : "outline"}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setSelectedFilters(prev => ({
+                              ...prev,
+                              is_published: prev.is_published === true ? null : true
+                            }));
+                          }}
+                        >
+                          Published
+                          {selectedFilters.is_published === true && (
+                            <Check className="ml-1 h-3 w-3" />
+                          )}
+                        </Badge>
+                        <Badge
+                          variant={selectedFilters.is_published === false ? "default" : "outline"}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setSelectedFilters(prev => ({
+                              ...prev,
+                              is_published: prev.is_published === false ? null : false
+                            }));
+                          }}
+                        >
+                          Draft
+                          {selectedFilters.is_published === false && (
+                            <Check className="ml-1 h-3 w-3" />
+                          )}
+                        </Badge>
+                      </div>
+                    </div>
+                    {/* Collection Filter */}
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Collection</h4>
+                      <select
+                        className="w-full rounded-md border border-input bg-background px-3 py-2"
+                        value={selectedFilters.collection_id || ''}
+                        onChange={e => setSelectedFilters(prev => ({ ...prev, collection_id: e.target.value || null }))}
+                      >
+                        <option value="">All Collections</option>
+                        {collections.map(col => (
+                          <option key={col.id} value={col.id}>{getCollectionLabel(col, collections)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Clear Filters */}
+                    {(selectedFilters.is_published !== null || selectedFilters.collection_id) && (
+                      <Button
+                        variant="ghost"
+                        className="w-full"
+                        onClick={() => setSelectedFilters({ is_published: null, collection_id: null })}
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {/* Add New Plant Button */}
+              <Button
+                onClick={() => setShowNewPlantForm(true)}
+                className="h-12 w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 px-4 text-base"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="hidden sm:inline">Add New Plant</span>
+              </Button>
+            </div>
+            {/* Active Filters Display */}
+            <div className="flex flex-wrap gap-2 mt-4">
+              {selectedFilters.is_published !== null && (
+                <Badge variant="secondary">
+                  Status: {selectedFilters.is_published ? 'Published' : 'Draft'}
+                  <X
+                    className="ml-1 h-3 w-3 cursor-pointer"
+                    onClick={() => setSelectedFilters(prev => ({ ...prev, is_published: null }))}
+                  />
+                </Badge>
+              )}
+              {selectedFilters.collection_id && (
+                <Badge variant="secondary">
+                  {(() => {
+                    const col = collections.find(c => String(c.id) === String(selectedFilters.collection_id));
+                    if (!col) {
+                      return <span className="flex items-center"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></span>Loading...</span>;
+                    }
+                    return col.name;
+                  })()}
+                  <X
+                    className="ml-1 h-3 w-3 cursor-pointer"
+                    onClick={() => setSelectedFilters(prev => ({ ...prev, collection_id: null }))}
+                  />
+                </Badge>
               )}
             </div>
-            <button
-              onClick={() => setShowNewPlantForm(true)}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              <Plus className="w-5 h-5" />
-              Add New Plant
-            </button>
           </div>
 
-          {/* New Plant Form */}
-          {showNewPlantForm && (
-            <div className="mb-8 p-4 sm:p-6 bg-white rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold mb-4">Add New Plant</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="common_name">Common Name</Label>
-                  <Input
-                    id="common_name"
-                    placeholder="Common Name"
-                    value={newPlant.common_name || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, common_name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="family">Family</Label>
-                  <Input
-                    id="family"
-                    placeholder="Family"
-                    value={newPlant.family || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, family: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="genus">Genus</Label>
-                  <Input
-                    id="genus"
-                    placeholder="Genus"
-                    value={newPlant.genus || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, genus: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="species">Species</Label>
-                  <Input
-                    id="species"
-                    placeholder="Species"
-                    value={newPlant.species || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, species: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="specific_epithet">Specific Epithet</Label>
-                  <Input
-                    id="specific_epithet"
-                    placeholder="Specific Epithet"
-                    value={newPlant.specific_epithet || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, specific_epithet: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subspecies">Subspecies</Label>
-                  <Input
-                    id="subspecies"
-                    placeholder="Subspecies"
-                    value={newPlant.subspecies || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, subspecies: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="variety">Variety</Label>
-                  <Input
-                    id="variety"
-                    placeholder="Variety"
-                    value={newPlant.variety || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, variety: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cultivar">Cultivar</Label>
-                  <Input
-                    id="cultivar"
-                    placeholder="Cultivar"
-                    value={newPlant.cultivar || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, cultivar: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="native_to">Native To</Label>
-                  <Input
-                    id="native_to"
-                    placeholder="Native To"
-                    value={newPlant.native_to || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, native_to: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bloom_period">Bloom Period</Label>
-                  <Input
-                    id="bloom_period"
-                    placeholder="Bloom Period"
-                    value={newPlant.bloom_period || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, bloom_period: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="slug">Slug</Label>
-                  <Input
-                    id="slug"
-                    placeholder="Slug"
-                    value={newPlant.slug || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, slug: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="default_collection_id">Default Collection ID</Label>
-                  <Input
-                    id="default_collection_id"
-                    type="number"
-                    value={newPlant.default_collection_id || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, default_collection_id: e.target.value ? parseInt(e.target.value) : null })}
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Description"
-                    value={newPlant.description || ''}
-                    onChange={(e) => setNewPlant({ ...newPlant, description: e.target.value })}
-                    rows="3"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowNewPlantForm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreate}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  Create Plant
-                </Button>
-              </div>
+          {/* Loading indicator for search */}
+          {isSearching && (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
             </div>
           )}
 
@@ -754,14 +965,6 @@ export default function PlantsDashboard() {
                                   id="cultivar"
                                   value={editingPlant.cultivar || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, cultivar: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="family">Family</Label>
-                                <Input
-                                  id="family"
-                                  value={editingPlant.family || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, family: e.target.value })}
                                 />
                               </div>
                               <div className="space-y-2">
@@ -909,6 +1112,30 @@ export default function PlantsDashboard() {
                               )}
                             </div>
                           )}
+                          {/* Global Sightings Row */}
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-sm text-gray-600 font-medium">Global Sightings:</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => updateGlobalSighting(plant.id, -1)}
+                              disabled={(globalSightings[plant.id] || 0) <= 0}
+                              aria-label="Decrease global sightings"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                            <span className="text-base font-semibold min-w-[2ch] text-center">
+                              {globalSightings[plant.id] ?? 0}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => updateGlobalSighting(plant.id, 1)}
+                              aria-label="Increase global sightings"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
