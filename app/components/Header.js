@@ -40,12 +40,18 @@ export default function Header() {
     setIsSigningOut(true);
     try {
       await signOut();
-      // Remove the immediate redirect - let auth state handle it
-      router.refresh(); // This will trigger a page refresh after sign out
+      router.refresh();
     } catch (error) {
       console.error('Error signing out:', error);
     } finally {
       setIsSigningOut(false);
+    }
+  };
+
+  const handleDashboardClick = (e) => {
+    if (!isAdmin) {
+      e.preventDefault();
+      setShowAuth(true);
     }
   };
 
@@ -85,19 +91,18 @@ export default function Header() {
               Flashcards
             </Link>
 
-            {isAdmin && (
-              <Link
-                href="/dashboard"
-                className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                  pathname === '/dashboard'
-                    ? 'text-green-600 border-b-2 border-green-500'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <CircleGauge className="w-4 h-4 mr-1" />
-                Admin Dashboard
-              </Link>
-            )}
+            <Link
+              href="/dashboard"
+              onClick={handleDashboardClick}
+              className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
+                pathname === '/dashboard'
+                  ? 'text-green-600 border-b-2 border-green-500'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <CircleGauge className="w-4 h-4 mr-1" />
+              Admin Dashboard
+            </Link>
           </nav>
 
           <div className="flex items-center">

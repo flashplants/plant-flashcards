@@ -692,19 +692,7 @@ function DashboardContent() {
   }
 
   if (!loading && !isAdmin) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
-            <p className="text-gray-600">You must be an administrator to access this page.</p>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
+    return null;
   }
 
   if (error) {
@@ -1234,7 +1222,11 @@ function DashboardContent() {
 
 export default function PlantsDashboard() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    }>
       <DashboardContent />
     </Suspense>
   );

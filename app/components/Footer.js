@@ -3,9 +3,40 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, House, GalleryHorizontalEnd, CircleGauge } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import AuthModal from './AuthModal';
 
 export default function Footer() {
   const pathname = usePathname();
+  const [showAuth, setShowAuth] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { user, supabase } = useAuth();
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+        
+        setIsAdmin(profile?.is_admin || false);
+      } else {
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user, supabase]);
+
+  const handleDashboardClick = (e) => {
+    if (!isAdmin) {
+      e.preventDefault();
+      setShowAuth(true);
+    }
+  };
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-2 z-50">
@@ -24,6 +55,7 @@ export default function Footer() {
           </Link>
           <Link
             href="/dashboard"
+            onClick={handleDashboardClick}
             className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
               pathname === '/dashboard'
                 ? 'text-green-600 bg-green-50'
@@ -46,6 +78,10 @@ export default function Footer() {
           </Link>
         </div>
       </nav>
+      <AuthModal 
+        isOpen={showAuth} 
+        onClose={() => setShowAuth(false)}
+      />
     </footer>
   );
 } 
