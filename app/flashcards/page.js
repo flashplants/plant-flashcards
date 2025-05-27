@@ -713,36 +713,6 @@ export default function PlantFlashcardApp() {
             )}
           </div>
 
-          {/* Stats */}
-          <div className="mb-6 bg-white rounded-lg shadow-md p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-600">Progress: {progress}%</span>
-              <button
-                onClick={resetSession}
-                className="flex items-center gap-2 px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-              >
-                <RotateCw className="w-4 h-4" />
-                Reset
-              </button>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-              <div 
-                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-center gap-8 text-sm">
-              <div className="flex items-center gap-2">
-                <Check className="w-5 h-5 text-green-600" />
-                <span className="text-gray-700">Correct: {stats.correct}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <X className="w-5 h-5 text-red-600" />
-                <span className="text-gray-700">Incorrect: {stats.incorrect}</span>
-              </div>
-            </div>
-          </div>
-
           {/* Flashcard */}
           <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -835,7 +805,7 @@ export default function PlantFlashcardApp() {
           </div>
 
           {/* Navigation */}
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-6">
             <button
               onClick={prevCard}
               className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md"
@@ -858,6 +828,36 @@ export default function PlantFlashcardApp() {
               Next
               <ChevronRight className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* Stats */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-gray-600">Progress: {progress}%</span>
+              <button
+                onClick={resetSession}
+                className="flex items-center gap-2 px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+              >
+                <RotateCw className="w-4 h-4" />
+                Reset
+              </button>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+              <div 
+                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-center gap-8 text-sm">
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-green-600" />
+                <span className="text-gray-700">Correct: {stats.correct}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <X className="w-5 h-5 text-red-600" />
+                <span className="text-gray-700">Incorrect: {stats.incorrect}</span>
+              </div>
+            </div>
           </div>
         </div>
       </main>
