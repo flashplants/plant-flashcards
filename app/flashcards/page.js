@@ -7,7 +7,7 @@ import {
   RotateCw,
   Check,
   X,
-  Heart,
+  Star,
   Eye,
   EyeOff,
   Filter,
@@ -404,7 +404,10 @@ export default function PlantFlashcardApp() {
     return shuffled;
   };
 
-  const toggleFavorite = async () => {
+  const toggleFavorite = async (e) => {
+    // Prevent the click from propagating to the card
+    e.stopPropagation();
+    
     if (!isAuthenticated) {
       setShowAuth(true);
       return;
@@ -650,7 +653,7 @@ export default function PlantFlashcardApp() {
                           : 'bg-gray-200 hover:bg-gray-300'
                       }`}
                     >
-                      <Heart className="w-4 h-4" />
+                      <Star className="w-4 h-4" />
                       Favorites ({favorites.size})
                     </button>
                     <button
@@ -755,11 +758,11 @@ export default function PlantFlashcardApp() {
                     onClick={toggleFavorite}
                     className={`p-2 rounded-lg transition-colors ${
                       favorites.has(currentPlant.id)
-                        ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                        ? 'text-yellow-500 bg-yellow-50 hover:bg-yellow-100'
                         : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
-                    <Heart className={`w-5 h-5 ${favorites.has(currentPlant.id) ? 'fill-current' : ''}`} />
+                    <Star className={`w-5 h-5 ${favorites.has(currentPlant.id) ? 'fill-current' : ''}`} />
                   </button>
                 )}
                 <button
