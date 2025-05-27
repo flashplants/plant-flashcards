@@ -148,7 +148,7 @@ const renderPlantName = (plant) => {
         </>
       ) : (
         <>
-          <span dangerouslySetInnerHTML={{ __html: part.text }} />
+          <span dangerouslySetInnerHTML={{ __html: part.italic ? `<i>${part.text}</i>` : part.text }} />
           {index < parts.length - 1 ? ',' : ''}
         </>
       )}
@@ -1282,7 +1282,7 @@ function DashboardContent() {
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <span className="font-medium text-gray-500">Family:</span>
-                                  <span className="ml-2 text-gray-900">{plant.family}</span>
+                                  <span className="ml-2 text-gray-900" dangerouslySetInnerHTML={{ __html: `<i>${plant.family}</i>` }}></span>
                                 </div>
                                 <div>
                                   <span className="font-medium text-gray-500">Native To:</span>
