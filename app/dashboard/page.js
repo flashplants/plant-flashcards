@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { debounce } from 'lodash';
 import { supabase } from '../lib/supabase';
@@ -284,7 +284,7 @@ export default function PlantsDashboard() {
           }
         }
         // Add filters
-        if (selectedFilters.is_published !== null) {
+        if (selectedFilters.is_published === true || selectedFilters.is_published === false) {
           queryBuilder = queryBuilder.eq('is_published', selectedFilters.is_published);
         }
         if (selectedFilters.collection_id) {
@@ -342,18 +342,54 @@ export default function PlantsDashboard() {
         await debouncedSearch(searchQuery);
         return;
       }
-
-      // First, get the total count
-      const { count, error: countError } = await supabase
-        .from('plants')
-        .select('*', { count: 'exact', head: true });
-
-      if (countError) throw countError;
-      setTotalCount(count);
-      setTotalPages(Math.ceil(count / pageSize));
-
-      // Then fetch the paginated data
-      const { data, error } = await supabase
+      // If collection filter is active, filter by collection
+      if (selectedFilters.collection_id) {
+        const { data: cpData, error: cpError } = await supabase
+          .from('collection_plants')
+          .select('plant_id')
+          .eq('collection_id', selectedFilters.collection_id);
+        if (cpError) throw cpError;
+        const plantIds = cpData.map(cp => cp.plant_id);
+        setTotalCount(plantIds.length);
+        setTotalPages(Math.ceil(plantIds.length / pageSize));
+        const pagedPlantIds = plantIds.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+        if (pagedPlantIds.length > 0) {
+          let query = supabase
+            .from('plants')
+            .select(`
+              *,
+              plant_images (
+                id,
+                path,
+                is_primary
+              )
+            `)
+            .in('id', pagedPlantIds)
+            .order('scientific_name');
+          if (selectedFilters.is_published === true || selectedFilters.is_published === false) {
+            query = query.eq('is_published', selectedFilters.is_published);
+          }
+          const { data, error } = await query;
+          if (error) throw error;
+          setPlants(data || []);
+          setLoading(false);
+          if (data && data.length) {
+            fetchGlobalSightings(data.map(p => p.id));
+          } else {
+            setGlobalSightings({});
+          }
+          return;
+        } else {
+          setPlants([]);
+          setGlobalSightings({});
+          setTotalCount(0);
+          setTotalPages(1);
+          setLoading(false);
+          return;
+        }
+      }
+      // Default: fetch all plants paginated, with is_published filter if set
+      let query = supabase
         .from('plants')
         .select(`
           *,
@@ -365,11 +401,13 @@ export default function PlantsDashboard() {
         `)
         .order('scientific_name')
         .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-
+      if (selectedFilters.is_published === true || selectedFilters.is_published === false) {
+        query = query.eq('is_published', selectedFilters.is_published);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       setPlants(data || []);
       setLoading(false);
-      // Fetch global sightings for these plants
       if (data && data.length) {
         fetchGlobalSightings(data.map(p => p.id));
       } else {
@@ -690,508 +728,413 @@ export default function PlantsDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-16">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <AuthModal 
-          isOpen={showAuth} 
-          onClose={() => setShowAuth(false)}
-          onSuccess={(user) => {
-            setUser(user);
-            fetchUserData();
-          }}
-        />
+    <Suspense fallback={<div className="p-8 text-center">Loading dashboard...</div>}>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-16">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <AuthModal 
+            isOpen={showAuth} 
+            onClose={() => setShowAuth(false)}
+            onSuccess={(user) => {
+              setUser(user);
+              fetchUserData();
+            }}
+          />
 
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Plants Dashboard</h1>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full">
-              {/* Search Bar */}
-              <div className="flex-1 relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Search className="w-5 h-5" />
-                </span>
-                <Input
-                  type="text"
-                  placeholder="Search plants..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="h-12 pl-10 pr-4 text-base w-full bg-white"
-                />
-              </div>
-              {/* Filters Button */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="h-12 w-full sm:w-[140px] flex items-center justify-between px-4 text-base"
-                  >
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filters
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-4">
-                  <div className="space-y-4">
-                    {/* Published Status Filter */}
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Published Status</h4>
-                      <div className="flex gap-2">
-                        <Badge
-                          variant={selectedFilters.is_published === true ? "default" : "outline"}
-                          className="cursor-pointer"
-                          onClick={() => {
-                            setSelectedFilters(prev => ({
-                              ...prev,
-                              is_published: prev.is_published === true ? null : true
-                            }));
-                          }}
-                        >
-                          Published
-                          {selectedFilters.is_published === true && (
-                            <Check className="ml-1 h-3 w-3" />
-                          )}
-                        </Badge>
-                        <Badge
-                          variant={selectedFilters.is_published === false ? "default" : "outline"}
-                          className="cursor-pointer"
-                          onClick={() => {
-                            setSelectedFilters(prev => ({
-                              ...prev,
-                              is_published: prev.is_published === false ? null : false
-                            }));
-                          }}
-                        >
-                          Draft
-                          {selectedFilters.is_published === false && (
-                            <Check className="ml-1 h-3 w-3" />
-                          )}
-                        </Badge>
-                      </div>
-                    </div>
-                    {/* Collection Filter */}
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Collection</h4>
-                      <select
-                        className="w-full rounded-md border border-input bg-background px-3 py-2"
-                        value={selectedFilters.collection_id || ''}
-                        onChange={e => setSelectedFilters(prev => ({ ...prev, collection_id: e.target.value || null }))}
-                      >
-                        <option value="">All Collections</option>
-                        {collections.map(col => (
-                          <option key={col.id} value={col.id}>{getCollectionLabel(col, collections)}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {/* Clear Filters */}
-                    {(selectedFilters.is_published !== null || selectedFilters.collection_id) && (
-                      <Button
-                        variant="ghost"
-                        className="w-full"
-                        onClick={() => setSelectedFilters({ is_published: null, collection_id: null })}
-                      >
-                        Clear Filters
-                      </Button>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-              {/* Add New Plant Button */}
-              <Button
-                onClick={() => setShowNewPlantForm(true)}
-                className="h-12 w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 px-4 text-base"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="hidden sm:inline">Add New Plant</span>
-              </Button>
-            </div>
-            {/* Active Filters Display */}
-            <div className="flex flex-wrap gap-2 mt-4">
-              {selectedFilters.is_published !== null && (
-                <Badge variant="secondary">
-                  Status: {selectedFilters.is_published ? 'Published' : 'Draft'}
-                  <X
-                    className="ml-1 h-3 w-3 cursor-pointer"
-                    onClick={() => setSelectedFilters(prev => ({ ...prev, is_published: null }))}
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Plants Dashboard</h1>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full">
+                {/* Search Bar */}
+                <div className="flex-1 relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Search className="w-5 h-5" />
+                  </span>
+                  <Input
+                    type="text"
+                    placeholder="Search plants..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="h-12 pl-10 pr-4 text-base w-full bg-white"
                   />
-                </Badge>
-              )}
-              {selectedFilters.collection_id && (
-                <Badge variant="secondary">
-                  {(() => {
-                    const col = collections.find(c => String(c.id) === String(selectedFilters.collection_id));
-                    if (!col) {
-                      return <span className="flex items-center"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></span>Loading...</span>;
-                    }
-                    return col.name;
-                  })()}
-                  <X
-                    className="ml-1 h-3 w-3 cursor-pointer"
-                    onClick={() => setSelectedFilters(prev => ({ ...prev, collection_id: null }))}
-                  />
-                </Badge>
-              )}
-            </div>
-          </div>
-
-          {/* Loading indicator for search */}
-          {isSearching && (
-            <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
-            </div>
-          )}
-
-          {/* Plants List */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="divide-y divide-gray-200">
-              {filteredPlants.map((plant) => (
-                <div 
-                  key={plant.id} 
-                  className="p-6"
-                >
-                  <div className="flex items-start gap-6">
-                    {/* Plant Image */}
-                    <div className="w-32 h-32 flex-shrink-0">
-                      {plant.plant_images?.[0] ? (
-                        <img
-                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[0].path}`}
-                          alt={buildFullPlantName(plant)}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
-                          <Image className="w-8 h-8 text-gray-400 mb-2" />
-                          <span className="text-sm text-gray-500">No image</span>
+                </div>
+                {/* Filters Button */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="h-12 w-full sm:w-[140px] flex items-center justify-between px-4 text-base"
+                    >
+                      <Filter className="mr-2 h-4 w-4" />
+                      Filters
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-4">
+                    <div className="space-y-4">
+                      {/* Published Status Filter */}
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Published Status</h4>
+                        <div className="flex gap-2">
+                          <Badge
+                            variant={selectedFilters.is_published === true ? "default" : "outline"}
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setSelectedFilters(prev => ({
+                                ...prev,
+                                is_published: prev.is_published === true ? null : true
+                              }));
+                            }}
+                          >
+                            Published
+                            {selectedFilters.is_published === true && (
+                              <Check className="ml-1 h-3 w-3" />
+                            )}
+                          </Badge>
+                          <Badge
+                            variant={selectedFilters.is_published === false ? "default" : "outline"}
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setSelectedFilters(prev => ({
+                                ...prev,
+                                is_published: prev.is_published === false ? null : false
+                              }));
+                            }}
+                          >
+                            Draft
+                            {selectedFilters.is_published === false && (
+                              <Check className="ml-1 h-3 w-3" />
+                            )}
+                          </Badge>
                         </div>
+                      </div>
+                      {/* Collection Filter */}
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Collection</h4>
+                        <select
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={selectedFilters.collection_id || ''}
+                          onChange={e => setSelectedFilters(prev => ({ ...prev, collection_id: e.target.value || null }))}
+                        >
+                          <option value="">All Collections</option>
+                          {collections.map(col => (
+                            <option key={col.id} value={col.id}>{getCollectionLabel(col, collections)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {/* Clear Filters */}
+                      {(selectedFilters.is_published !== null || selectedFilters.collection_id) && (
+                        <Button
+                          variant="ghost"
+                          className="w-full"
+                          onClick={() => setSelectedFilters({ is_published: null, collection_id: null })}
+                        >
+                          Clear Filters
+                        </Button>
                       )}
                     </div>
+                  </PopoverContent>
+                </Popover>
+                {/* Add New Plant Button */}
+                <Button
+                  onClick={() => setShowNewPlantForm(true)}
+                  className="h-12 w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 px-4 text-base"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="hidden sm:inline">Add New Plant</span>
+                </Button>
+              </div>
+              {/* Active Filters Display */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                {selectedFilters.is_published !== null && (
+                  <Badge variant="secondary">
+                    Status: {selectedFilters.is_published ? 'Published' : 'Draft'}
+                    <X
+                      className="ml-1 h-3 w-3 cursor-pointer"
+                      onClick={() => setSelectedFilters(prev => ({ ...prev, is_published: null }))}
+                    />
+                  </Badge>
+                )}
+                {selectedFilters.collection_id && (
+                  <Badge variant="secondary">
+                    {(() => {
+                      const col = collections.find(c => String(c.id) === String(selectedFilters.collection_id));
+                      if (!col) {
+                        return <span className="flex items-center"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></span>Loading...</span>;
+                      }
+                      return col.name;
+                    })()}
+                    <X
+                      className="ml-1 h-3 w-3 cursor-pointer"
+                      onClick={() => setSelectedFilters(prev => ({ ...prev, collection_id: null }))}
+                    />
+                  </Badge>
+                )}
+              </div>
+            </div>
 
-                    {/* Plant Details */}
-                    <div className="flex-1 min-w-0">
-                      {editingPlant?.id === plant.id ? (
-                        <Card className="border-0 shadow-none">
-                          <CardContent className="p-0 space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="common_name">Common Name</Label>
-                                <Input
-                                  id="common_name"
-                                  value={editingPlant.common_name || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, common_name: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="genus">Genus</Label>
-                                <Input
-                                  id="genus"
-                                  value={editingPlant.genus || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, genus: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="species">Species</Label>
-                                <Input
-                                  id="species"
-                                  value={editingPlant.species || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, species: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="specific_epithet">Specific Epithet</Label>
-                                <Input
-                                  id="specific_epithet"
-                                  value={editingPlant.specific_epithet || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, specific_epithet: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="hybrid_marker">Hybrid Marker</Label>
-                                <Input
-                                  id="hybrid_marker"
-                                  value={editingPlant.hybrid_marker || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="hybrid_marker_position">Hybrid Marker Position</Label>
-                                <select
-                                  id="hybrid_marker_position"
-                                  value={editingPlant.hybrid_marker_position || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker_position: e.target.value })}
-                                  className="w-full rounded-md border border-input bg-background px-3 py-2"
-                                >
-                                  <option value="none">None</option>
-                                  <option value="genus">Genus</option>
-                                  <option value="species">Species</option>
-                                  <option value="infraspecies">Infraspecies</option>
-                                </select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="infraspecies_rank">Infraspecies Rank</Label>
-                                <Input
-                                  id="infraspecies_rank"
-                                  value={editingPlant.infraspecies_rank || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_rank: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="infraspecies_epithet">Infraspecies Epithet</Label>
-                                <Input
-                                  id="infraspecies_epithet"
-                                  value={editingPlant.infraspecies_epithet || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_epithet: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="subspecies">Subspecies</Label>
-                                <Input
-                                  id="subspecies"
-                                  value={editingPlant.subspecies || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, subspecies: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="variety">Variety</Label>
-                                <Input
-                                  id="variety"
-                                  value={editingPlant.variety || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, variety: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="cultivar">Cultivar</Label>
-                                <Input
-                                  id="cultivar"
-                                  value={editingPlant.cultivar || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, cultivar: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="native_to">Native To</Label>
-                                <Input
-                                  id="native_to"
-                                  value={editingPlant.native_to || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, native_to: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="bloom_period">Bloom Period</Label>
-                                <Input
-                                  id="bloom_period"
-                                  value={editingPlant.bloom_period || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, bloom_period: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="slug">Slug</Label>
-                                <Input
-                                  id="slug"
-                                  value={editingPlant.slug || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, slug: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="default_collection_id">Default Collection ID</Label>
-                                <Input
-                                  id="default_collection_id"
-                                  type="number"
-                                  value={editingPlant.default_collection_id || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, default_collection_id: e.target.value ? parseInt(e.target.value) : null })}
-                                />
-                              </div>
-                              <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="description">Description</Label>
-                                <Textarea
-                                  id="description"
-                                  value={editingPlant.description || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, description: e.target.value })}
-                                  rows={3}
-                                />
-                              </div>
-                              <div className="space-y-2 sm:col-span-2">
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    id="is_published"
-                                    checked={editingPlant.is_published}
-                                    onChange={(e) => setEditingPlant({ ...editingPlant, is_published: e.target.checked })}
-                                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+            {/* Loading indicator for search */}
+            {isSearching && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+              </div>
+            )}
+
+            {/* Plants List */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="divide-y divide-gray-200">
+                {filteredPlants.map((plant) => (
+                  <div 
+                    key={plant.id} 
+                    className="p-6"
+                  >
+                    <div className="flex items-start gap-6">
+                      {/* Plant Image */}
+                      <div className="w-32 h-32 flex-shrink-0">
+                        {plant.plant_images?.[0] ? (
+                          <img
+                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[0].path}`}
+                            alt={buildFullPlantName(plant)}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                            <Image className="w-8 h-8 text-gray-400 mb-2" />
+                            <span className="text-sm text-gray-500">No image</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Plant Details */}
+                      <div className="flex-1 min-w-0">
+                        {editingPlant?.id === plant.id ? (
+                          <Card className="border-0 shadow-none">
+                            <CardContent className="p-0 space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="common_name">Common Name</Label>
+                                  <Input
+                                    id="common_name"
+                                    value={editingPlant.common_name || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, common_name: e.target.value })}
                                   />
-                                  <Label htmlFor="is_published">Published</Label>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="genus">Genus</Label>
+                                  <Input
+                                    id="genus"
+                                    value={editingPlant.genus || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, genus: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="species">Species</Label>
+                                  <Input
+                                    id="species"
+                                    value={editingPlant.species || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, species: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="specific_epithet">Specific Epithet</Label>
+                                  <Input
+                                    id="specific_epithet"
+                                    value={editingPlant.specific_epithet || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, specific_epithet: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="hybrid_marker">Hybrid Marker</Label>
+                                  <Input
+                                    id="hybrid_marker"
+                                    value={editingPlant.hybrid_marker || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="hybrid_marker_position">Hybrid Marker Position</Label>
+                                  <select
+                                    id="hybrid_marker_position"
+                                    value={editingPlant.hybrid_marker_position || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker_position: e.target.value })}
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                                  >
+                                    <option value="none">None</option>
+                                    <option value="genus">Genus</option>
+                                    <option value="species">Species</option>
+                                    <option value="infraspecies">Infraspecies</option>
+                                  </select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="infraspecies_rank">Infraspecies Rank</Label>
+                                  <Input
+                                    id="infraspecies_rank"
+                                    value={editingPlant.infraspecies_rank || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_rank: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="infraspecies_epithet">Infraspecies Epithet</Label>
+                                  <Input
+                                    id="infraspecies_epithet"
+                                    value={editingPlant.infraspecies_epithet || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_epithet: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="subspecies">Subspecies</Label>
+                                  <Input
+                                    id="subspecies"
+                                    value={editingPlant.subspecies || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, subspecies: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="variety">Variety</Label>
+                                  <Input
+                                    id="variety"
+                                    value={editingPlant.variety || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, variety: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="cultivar">Cultivar</Label>
+                                  <Input
+                                    id="cultivar"
+                                    value={editingPlant.cultivar || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, cultivar: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="native_to">Native To</Label>
+                                  <Input
+                                    id="native_to"
+                                    value={editingPlant.native_to || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, native_to: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="bloom_period">Bloom Period</Label>
+                                  <Input
+                                    id="bloom_period"
+                                    value={editingPlant.bloom_period || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, bloom_period: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="slug">Slug</Label>
+                                  <Input
+                                    id="slug"
+                                    value={editingPlant.slug || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, slug: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="default_collection_id">Default Collection ID</Label>
+                                  <Input
+                                    id="default_collection_id"
+                                    type="number"
+                                    value={editingPlant.default_collection_id || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, default_collection_id: e.target.value ? parseInt(e.target.value) : null })}
+                                  />
+                                </div>
+                                <div className="space-y-2 sm:col-span-2">
+                                  <Label htmlFor="description">Description</Label>
+                                  <Textarea
+                                    id="description"
+                                    value={editingPlant.description || ''}
+                                    onChange={(e) => setEditingPlant({ ...editingPlant, description: e.target.value })}
+                                    rows={3}
+                                  />
+                                </div>
+                                <div className="space-y-2 sm:col-span-2">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id="is_published"
+                                      checked={editingPlant.is_published}
+                                      onChange={(e) => setEditingPlant({ ...editingPlant, is_published: e.target.checked })}
+                                      className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    <Label htmlFor="is_published">Published</Label>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            {/* Image Management Section */}
-                            <div className="pt-6 border-t">
-                              <Label className="text-base font-semibold mb-4 block">Plant Images</Label>
-                              <PlantImageManager
-                                plantId={editingPlant.id}
-                                plantName={buildFullPlantName(editingPlant)}
-                                genus={editingPlant.genus}
-                                specific_epithet={editingPlant.specific_epithet}
-                                infraspecies_rank={editingPlant.infraspecies_rank}
-                                variety={editingPlant.variety}
-                                cultivar={editingPlant.cultivar}
-                                supabase={supabase}
-                                onImagesChange={() => fetchPlants()}
-                              />
-                            </div>
+                              {/* Image Management Section */}
+                              <div className="pt-6 border-t">
+                                <Label className="text-base font-semibold mb-4 block">Plant Images</Label>
+                                <PlantImageManager
+                                  plantId={editingPlant.id}
+                                  plantName={buildFullPlantName(editingPlant)}
+                                  genus={editingPlant.genus}
+                                  specific_epithet={editingPlant.specific_epithet}
+                                  infraspecies_rank={editingPlant.infraspecies_rank}
+                                  variety={editingPlant.variety}
+                                  cultivar={editingPlant.cultivar}
+                                  supabase={supabase}
+                                  onImagesChange={() => fetchPlants()}
+                                />
+                              </div>
 
-                            <div className="flex justify-end gap-2 pt-4">
+                              <div className="flex justify-end gap-2 pt-4">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setEditingPlant(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  onClick={() => handleSave(editingPlant)}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Save Changes
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {buildFullPlantName(plant)}
+                              </h3>
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                plant.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {plant.is_published ? 'Published' : 'Draft'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <Button
                                 variant="outline"
-                                onClick={() => setEditingPlant(null)}
+                                size="sm"
+                                onClick={() => handleEdit(plant)}
                               >
-                                Cancel
+                                Edit
                               </Button>
                               <Button
-                                onClick={() => handleSave(editingPlant)}
-                                className="bg-green-600 hover:bg-green-700"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDelete(plant.id)}
                               >
-                                Save Changes
+                                Delete
                               </Button>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {buildFullPlantName(plant)}
-                            </h3>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              plant.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {plant.is_published ? 'Published' : 'Draft'}
-                            </span>
                           </div>
-                          <p className="text-sm text-gray-500">
-                            {plant.common_name}
-                          </p>
-                          {expandedPlant === plant.id && (
-                            <div className="mt-4 space-y-2 text-sm">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <span className="font-medium text-gray-500">Family:</span>
-                                  <span className="ml-2 text-gray-900">{plant.family}</span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-500">Native To:</span>
-                                  <span className="ml-2 text-gray-900">{plant.native_to}</span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-500">Bloom Period:</span>
-                                  <span className="ml-2 text-gray-900">{plant.bloom_period}</span>
-                                </div>
-                                {plant.specific_epithet && (
-                                  <div>
-                                    <span className="font-medium text-gray-500">Specific Epithet:</span>
-                                    <span className="ml-2 text-gray-900">{plant.specific_epithet}</span>
-                                  </div>
-                                )}
-                                {plant.infraspecies_rank && (
-                                  <div>
-                                    <span className="font-medium text-gray-500">Infraspecies Rank:</span>
-                                    <span className="ml-2 text-gray-900">{plant.infraspecies_rank}</span>
-                                  </div>
-                                )}
-                                {plant.infraspecies_epithet && (
-                                  <div>
-                                    <span className="font-medium text-gray-500">Infraspecies Epithet:</span>
-                                    <span className="ml-2 text-gray-900">{plant.infraspecies_epithet}</span>
-                                  </div>
-                                )}
-                              </div>
-                              {plant.description && (
-                                <div className="mt-2">
-                                  <span className="font-medium text-gray-500">Description:</span>
-                                  <p className="mt-1 text-gray-900">{plant.description}</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {/* Global Sightings Row */}
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-sm text-gray-600 font-medium">Global Sightings:</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => updateGlobalSighting(plant.id, -1)}
-                              disabled={(globalSightings[plant.id] || 0) <= 0}
-                              aria-label="Decrease global sightings"
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span className="text-base font-semibold min-w-[2ch] text-center">
-                              {globalSightings[plant.id] ?? 0}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => updateGlobalSighting(plant.id, 1)}
-                              aria-label="Increase global sightings"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-start gap-1">
-                      {editingPlant?.id !== plant.id && (
-                        <>
-                          {user && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleFavorite(plant)}
-                              className={favorites.has(plant.id) ? 'text-red-500' : 'text-gray-400'}
-                            >
-                              <Star className={`w-5 h-5 ${favorites.has(plant.id) ? 'fill-current' : ''}`} />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(plant)}
-                          >
-                            <Edit className="w-5 h-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(plant.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setExpandedPlant(expandedPlant === plant.id ? null : plant.id)}
-                          >
-                            {expandedPlant === plant.id ? (
-                              <ChevronUp className="w-5 h-5" />
-                            ) : (
-                              <ChevronDown className="w-5 h-5" />
-                            )}
-                          </Button>
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <PaginationControls />
             </div>
-            <PaginationControls />
           </div>
-        </div>
-      </main>
-      <Footer />
-    </div>
+        </main>
+        <Footer />
+      </div>
+    </Suspense>
   );
-} 
+}
