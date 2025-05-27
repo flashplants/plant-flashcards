@@ -74,9 +74,9 @@ function buildFullPlantName(plant) {
   let nameParts = [];
   
   // Add hybrid marker based on position
-  if (plant.hybrid_marker) {
+  if (plant.hybrid_marker === 'x') {
     if (plant.hybrid_marker_position === 'before_genus') {
-      nameParts.push(plant.hybrid_marker);
+      nameParts.push('x');
     }
   }
   
@@ -84,8 +84,8 @@ function buildFullPlantName(plant) {
   nameParts.push(plant.genus);
   
   // Add hybrid marker if it should be between genus and species
-  if (plant.hybrid_marker && plant.hybrid_marker_position === 'between_genus_species') {
-    nameParts.push(plant.hybrid_marker);
+  if (plant.hybrid_marker === 'x' && plant.hybrid_marker_position === 'between_genus_species') {
+    nameParts.push('x');
   }
   
   // Add remaining parts
@@ -93,9 +93,13 @@ function buildFullPlantName(plant) {
     plant.specific_epithet,
     plant.infraspecies_rank,
     plant.infraspecies_epithet,
-    plant.variety,
-    plant.cultivar
+    plant.variety
   ]);
+
+  // Add cultivar with single quotes if it exists
+  if (plant.cultivar) {
+    nameParts.push(`'${plant.cultivar}'`);
+  }
   
   return nameParts
     .map(clean)
@@ -383,6 +387,9 @@ function DashboardContent() {
                 id,
                 path,
                 is_primary
+              ),
+              collection_plants (
+                collection_id
               )
             `)
             .in('id', pagedPlantIds)
@@ -420,6 +427,9 @@ function DashboardContent() {
             id,
             path,
             is_primary
+          ),
+          collection_plants (
+            collection_id
           )
         `)
         .order('scientific_name')
@@ -456,7 +466,14 @@ function DashboardContent() {
 
   const handleSave = async (plant) => {
     try {
-      const { error } = await supabase
+      // Validate required fields
+      if (!plant.genus || !plant.family) {
+        alert('Genus and Family are required fields');
+        return;
+      }
+
+      // Start a transaction
+      const { error: updateError } = await supabase
         .from('plants')
         .update({
           scientific_name: plant.scientific_name,
@@ -483,7 +500,33 @@ function DashboardContent() {
         })
         .eq('id', plant.id);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // Handle collection assignment
+      if (plant.collection_id) {
+        // First, remove any existing collection assignments
+        await supabase
+          .from('collection_plants')
+          .delete()
+          .eq('plant_id', plant.id);
+
+        // Then add the new collection assignment
+        const { error: collectionError } = await supabase
+          .from('collection_plants')
+          .insert({
+            collection_id: plant.collection_id,
+            plant_id: plant.id
+          });
+
+        if (collectionError) throw collectionError;
+      } else {
+        // If no collection selected, remove any existing assignments
+        await supabase
+          .from('collection_plants')
+          .delete()
+          .eq('plant_id', plant.id);
+      }
+
       setEditingPlant(null);
       fetchPlants();
     } catch (err) {
@@ -509,11 +552,33 @@ function DashboardContent() {
 
   const handleCreate = async () => {
     try {
-      const { error } = await supabase
-        .from('plants')
-        .insert([newPlant]);
+      // Validate required fields
+      if (!newPlant.genus || !newPlant.family) {
+        alert('Genus and Family are required fields');
+        return;
+      }
 
-      if (error) throw error;
+      // Insert the plant
+      const { data: plantData, error: insertError } = await supabase
+        .from('plants')
+        .insert([newPlant])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Handle collection assignment if selected
+      if (newPlant.collection_id && plantData) {
+        const { error: collectionError } = await supabase
+          .from('collection_plants')
+          .insert({
+            collection_id: newPlant.collection_id,
+            plant_id: plantData.id
+          });
+
+        if (collectionError) throw collectionError;
+      }
+
       setShowNewPlantForm(false);
       setNewPlant({
         scientific_name: '',
@@ -536,7 +601,8 @@ function DashboardContent() {
         image_url: '',
         external_resources: {},
         slug: '',
-        default_collection_id: null
+        default_collection_id: null,
+        collection_id: null
       });
       fetchPlants();
     } catch (err) {
@@ -927,12 +993,36 @@ function DashboardContent() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="genus">Genus</Label>
+                                <Label htmlFor="genus" className="flex items-center gap-1">
+                                  Genus
+                                  <span className="text-red-500">*</span>
+                                </Label>
                                 <Input
                                   id="genus"
                                   value={editingPlant.genus || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, genus: e.target.value })}
+                                  required
+                                  className={!editingPlant.genus ? "border-red-300 focus:ring-red-500" : ""}
                                 />
+                                {!editingPlant.genus && (
+                                  <p className="text-sm text-red-500">Genus is required</p>
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="family" className="flex items-center gap-1">
+                                  Family
+                                  <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                  id="family"
+                                  value={editingPlant.family || ''}
+                                  onChange={(e) => setEditingPlant({ ...editingPlant, family: e.target.value })}
+                                  required
+                                  className={!editingPlant.family ? "border-red-300 focus:ring-red-500" : ""}
+                                />
+                                {!editingPlant.family && (
+                                  <p className="text-sm text-red-500">Family is required</p>
+                                )}
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="species">Species</Label>
@@ -951,12 +1041,20 @@ function DashboardContent() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="hybrid_marker">Hybrid Marker</Label>
-                                <Input
-                                  id="hybrid_marker"
-                                  value={editingPlant.hybrid_marker || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker: e.target.value })}
-                                />
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id="hybrid_marker"
+                                    checked={editingPlant.hybrid_marker === 'x'}
+                                    onChange={(e) => setEditingPlant({ 
+                                      ...editingPlant, 
+                                      hybrid_marker: e.target.checked ? 'x' : '',
+                                      hybrid_marker_position: e.target.checked ? editingPlant.hybrid_marker_position : 'none'
+                                    })}
+                                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                  />
+                                  <Label htmlFor="hybrid_marker">Hybrid (x)</Label>
+                                </div>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="hybrid_marker_position">Hybrid Marker Position</Label>
@@ -965,6 +1063,7 @@ function DashboardContent() {
                                   value={editingPlant.hybrid_marker_position || 'none'}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker_position: e.target.value })}
                                   className="w-full rounded-md border border-input bg-background px-3 py-2"
+                                  disabled={!editingPlant.hybrid_marker}
                                 >
                                   <option value="none">None</option>
                                   <option value="before_genus">Before Genus</option>
@@ -973,11 +1072,19 @@ function DashboardContent() {
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="infraspecies_rank">Infraspecies Rank</Label>
-                                <Input
+                                <select
                                   id="infraspecies_rank"
                                   value={editingPlant.infraspecies_rank || ''}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, infraspecies_rank: e.target.value })}
-                                />
+                                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                                >
+                                  <option value="">None</option>
+                                  <option value="f.">f.</option>
+                                  <option value="var.">var.</option>
+                                  <option value="spp.">spp.</option>
+                                  <option value="ssp.">ssp.</option>
+                                  <option value="Purpureus Group">Purpureus Group</option>
+                                </select>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="infraspecies_epithet">Infraspecies Epithet</Label>
@@ -1036,13 +1143,18 @@ function DashboardContent() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="default_collection_id">Default Collection ID</Label>
-                                <Input
-                                  id="default_collection_id"
-                                  type="number"
-                                  value={editingPlant.default_collection_id || ''}
-                                  onChange={(e) => setEditingPlant({ ...editingPlant, default_collection_id: e.target.value ? parseInt(e.target.value) : null })}
-                                />
+                                <Label htmlFor="collection_id">Collection</Label>
+                                <select
+                                  id="collection_id"
+                                  value={editingPlant.collection_id || ''}
+                                  onChange={(e) => setEditingPlant({ ...editingPlant, collection_id: e.target.value ? parseInt(e.target.value) : null })}
+                                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                                >
+                                  <option value="">No Collection</option>
+                                  {collections.map(col => (
+                                    <option key={col.id} value={col.id}>{col.name}</option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="space-y-2 sm:col-span-2">
                                 <Label htmlFor="description">Description</Label>
