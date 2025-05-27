@@ -24,41 +24,97 @@ import { supabase } from '../lib/supabase';
 
 // Helper function to build full plant name
 function buildFullPlantName(plant) {
-  // Remove punctuation and join all relevant fields
-  const clean = (str) => str ? str.replace(/[^a-zA-Z0-9-]/g, '') : '';
-  
+  if (!plant) return '';
+
   // Build the name parts array
   let nameParts = [];
   
-  // Add hybrid marker based on position
-  if (plant.hybrid_marker) {
+  // Add hybrid marker based on position (never italicized)
+  if (plant.hybrid_marker === 'x') {
     if (plant.hybrid_marker_position === 'before_genus') {
-      nameParts.push(plant.hybrid_marker);
+      nameParts.push({ text: 'x', italic: false });
     }
   }
   
-  // Add genus
-  nameParts.push(plant.genus);
-  
-  // Add hybrid marker if it should be between genus and species
-  if (plant.hybrid_marker && plant.hybrid_marker_position === 'between_genus_species') {
-    nameParts.push(plant.hybrid_marker);
+  // Add genus (italic)
+  if (plant.genus) {
+    nameParts.push({ text: plant.genus, italic: true });
   }
   
-  // Add remaining parts
-  nameParts = nameParts.concat([
-    plant.specific_epithet,
-    plant.infraspecies_rank,
-    plant.infraspecies_epithet,
-    plant.variety,
-    plant.cultivar
-  ]);
+  // Add hybrid marker if it should be between genus and species (never italicized)
+  if (plant.hybrid_marker === 'x' && plant.hybrid_marker_position === 'between_genus_species') {
+    nameParts.push({ text: 'x', italic: false });
+  }
   
-  return nameParts
-    .map(clean)
-    .filter(Boolean)
-    .join(' ');
+  // Add specific epithet (italic)
+  if (plant.specific_epithet) {
+    nameParts.push({ text: plant.specific_epithet, italic: true });
+  }
+
+  // Add infraspecies rank and epithet if they exist
+  if (plant.infraspecies_rank && plant.infraspecies_epithet) {
+    // Convert subsp. to ssp.
+    const rank = plant.infraspecies_rank === 'subsp.' ? 'ssp.' : plant.infraspecies_rank;
+    nameParts.push({ text: rank, italic: false });
+    nameParts.push({ text: plant.infraspecies_epithet, italic: true });
+  }
+
+  // Add variety if it exists
+  if (plant.variety) {
+    nameParts.push({ text: 'var.', italic: false });
+    nameParts.push({ text: plant.variety, italic: true });
+  }
+
+  // Add cultivar with single quotes if it exists
+  if (plant.cultivar) {
+    nameParts.push({ text: `'${plant.cultivar}'`, italic: false });
+  }
+
+  // Build the final string with proper spacing and commas
+  let result = [];
+  
+  // Add the scientific name parts with proper italicization
+  let scientificNameParts = nameParts.map(part => {
+    if (typeof part === 'string') {
+      return part;
+    }
+    return part.italic ? `<i>${part.text}</i>` : part.text;
+  });
+  result.push({ text: scientificNameParts.join(' '), italic: false });
+
+  // Add common name if it exists
+  if (plant.common_name) {
+    result.push(plant.common_name);
+  }
+
+  // Add family if it exists
+  if (plant.family) {
+    result.push({ text: plant.family, italic: true });
+  }
+
+  return result;
 }
+
+// Helper function to render plant name
+const renderPlantName = (plant) => {
+  const parts = buildFullPlantName(plant);
+  return parts.map((part, index) => (
+    <span key={index}>
+      {typeof part === 'string' ? (
+        <>
+          {part}
+          {index < parts.length - 1 ? ',' : ''}
+        </>
+      ) : (
+        <>
+          <span dangerouslySetInnerHTML={{ __html: part.text }} />
+          {index < parts.length - 1 ? ',' : ''}
+        </>
+      )}
+      {index < parts.length - 1 ? ' ' : ''}
+    </span>
+  ));
+};
 
 // Debounce function
 const debounce = (func, wait) => {
@@ -362,19 +418,29 @@ export default function PlantFlashcardApp() {
     if (!user) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('study_sessions')
-        .insert({
+        .upsert({
           user_id: user.id,
           plant_id: plantId,
-          session_date: new Date().toISOString()
-        });
+          count: 1
+        }, {
+          onConflict: 'user_id,plant_id',
+          count: 'count + 1'
+        })
+        .select();
 
       if (error) {
-        console.error('Error recording study session:', error);
+        console.error('Error recording study session:', error.message);
+        return;
+      }
+
+      if (!data) {
+        console.error('No data returned from study session insert');
+        return;
       }
     } catch (err) {
-      console.error('Error in study session:', err);
+      console.error('Error in study session:', err.message);
     }
   };
 
@@ -656,7 +722,7 @@ export default function PlantFlashcardApp() {
                 ) : (
                   <div>
                     <h2 className="text-2xl font-bold text-green-700 mb-2">
-                      {buildFullPlantName(currentPlant)}
+                      {renderPlantName(currentPlant)}
                     </h2>
                     <p className="text-gray-600 mb-1">
                       Family: {currentPlant.family}
