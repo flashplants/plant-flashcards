@@ -69,14 +69,35 @@ const generateSuffix = () => {
 function buildFullPlantName(plant) {
   // Remove punctuation and join all relevant fields
   const clean = (str) => str ? str.replace(/[^a-zA-Z0-9-]/g, '') : '';
-  return [
-    plant.genus,
+  
+  // Build the name parts array
+  let nameParts = [];
+  
+  // Add hybrid marker based on position
+  if (plant.hybrid_marker) {
+    if (plant.hybrid_marker_position === 'before_genus') {
+      nameParts.push(plant.hybrid_marker);
+    }
+  }
+  
+  // Add genus
+  nameParts.push(plant.genus);
+  
+  // Add hybrid marker if it should be between genus and species
+  if (plant.hybrid_marker && plant.hybrid_marker_position === 'between_genus_species') {
+    nameParts.push(plant.hybrid_marker);
+  }
+  
+  // Add remaining parts
+  nameParts = nameParts.concat([
     plant.specific_epithet,
     plant.infraspecies_rank,
     plant.infraspecies_epithet,
     plant.variety,
     plant.cultivar
-  ]
+  ]);
+  
+  return nameParts
     .map(clean)
     .filter(Boolean)
     .join(' ');
@@ -941,14 +962,13 @@ function DashboardContent() {
                                 <Label htmlFor="hybrid_marker_position">Hybrid Marker Position</Label>
                                 <select
                                   id="hybrid_marker_position"
-                                  value={editingPlant.hybrid_marker_position || ''}
+                                  value={editingPlant.hybrid_marker_position || 'none'}
                                   onChange={(e) => setEditingPlant({ ...editingPlant, hybrid_marker_position: e.target.value })}
                                   className="w-full rounded-md border border-input bg-background px-3 py-2"
                                 >
                                   <option value="none">None</option>
-                                  <option value="genus">Genus</option>
-                                  <option value="species">Species</option>
-                                  <option value="infraspecies">Infraspecies</option>
+                                  <option value="before_genus">Before Genus</option>
+                                  <option value="between_genus_species">Between Genus and Species</option>
                                 </select>
                               </div>
                               <div className="space-y-2">
