@@ -461,7 +461,12 @@ function DashboardContent() {
   }, [currentPage]);
 
   const handleEdit = (plant) => {
-    setEditingPlant({ ...plant });
+    // Get the collection_id from collection_plants if it exists
+    const collectionId = plant.collection_plants?.[0]?.collection_id || null;
+    setEditingPlant({ 
+      ...plant,
+      collection_id: collectionId
+    });
   };
 
   const handleSave = async (plant) => {
