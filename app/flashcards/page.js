@@ -324,10 +324,13 @@ export default function PlantFlashcardApp() {
     if (!user) return;
 
     try {
-      const { error } = await supabase.rpc('increment_study_session', {
-        p_user_id: user.id,
-        p_plant_id: plantId
-      });
+      const { error } = await supabase
+        .from('study_sessions')
+        .insert({
+          user_id: user.id,
+          plant_id: plantId,
+          session_date: new Date().toISOString()
+        });
 
       if (error) {
         console.error('Error recording study session:', error);
