@@ -983,6 +983,14 @@ function DashboardContent() {
                       {editingPlant?.id === plant.id ? (
                         <Card className="border-0 shadow-none">
                           <CardContent className="p-0 space-y-4">
+                            <div className="border-b pb-4">
+                              <h3 className="text-xl font-semibold text-gray-900">
+                                {buildFullPlantName(editingPlant)}
+                              </h3>
+                              <p className="text-sm text-gray-500 mt-1">
+                                Edit plant details below
+                              </p>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-2">
                                 <Label htmlFor="common_name">Common Name</Label>
