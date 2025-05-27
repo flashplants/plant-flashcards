@@ -107,7 +107,7 @@ const renderPlantName = (plant) => {
         </>
       ) : (
         <>
-          <span dangerouslySetInnerHTML={{ __html: part.text }} />
+          <span dangerouslySetInnerHTML={{ __html: part.italic ? `<i>${part.text}</i>` : part.text }} />
           {index < parts.length - 1 ? ',' : ''}
         </>
       )}
