@@ -21,6 +21,7 @@ import AuthModal from '../components/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
+import { Button } from "@/components/ui/button";
 
 // Helper function to build full plant name
 function buildFullPlantName(plant) {
@@ -144,6 +145,7 @@ export default function PlantFlashcardApp() {
   const [selectedCollection, setSelectedCollection] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
+  const [sightingsFilter, setSightingsFilter] = useState('all');
   const { user, isAuthenticated } = useAuth();
 
   // Memoize fetchUserData to prevent recreation on every render
@@ -199,10 +201,17 @@ export default function PlantFlashcardApp() {
       return;
     }
 
+    // Apply sightings filter first
+    if (sightingsFilter !== 'all') {
+      const minSightings = parseInt(sightingsFilter);
+      filtered = filtered.filter(plant => plant.sightings_count >= minSightings);
+    }
+
+    // Then apply other filters
     switch (filterMode) {
       case 'favorites':
         if (isAuthenticated) {
-          filtered = plants.filter(p => favorites.has(p.id));
+          filtered = filtered.filter(p => favorites.has(p.id));
         } else {
           setShowAuth(true);
           setFilterMode('all');
@@ -232,7 +241,7 @@ export default function PlantFlashcardApp() {
     }
 
     setFilteredPlants(filtered);
-  }, [filterMode, selectedCollection, favorites, plants, isAuthenticated]);
+  }, [filterMode, selectedCollection, favorites, plants, isAuthenticated, sightingsFilter]);
 
   // Fetch user data when user changes
   useEffect(() => {
@@ -254,6 +263,9 @@ export default function PlantFlashcardApp() {
             id,
             path,
             is_primary
+          ),
+          global_sighting_counts (
+            sighting_count
           )
         `)
         .eq('is_published', true)
@@ -263,7 +275,13 @@ export default function PlantFlashcardApp() {
 
       if (error) throw error;
       
-      setPlants(shuffleArray(data || []));
+      // Add sightings count to each plant
+      const plantsWithSightings = (data || []).map(plant => ({
+        ...plant,
+        sightings_count: plant.global_sighting_counts?.[0]?.sighting_count || 0
+      }));
+      
+      setPlants(shuffleArray(plantsWithSightings));
       setLoading(false);
     } catch (err) {
       setError(err.message);
@@ -505,6 +523,13 @@ export default function PlantFlashcardApp() {
   // Determine which plants to display
   const displayPlants = filteredPlants.length > 0 ? filteredPlants : plants;
 
+  // Add a function to get the count of plants for each sightings filter
+  const getSightingsCount = (minSightings) => {
+    if (minSightings === 'all') return plants.length;
+    const minCount = parseInt(minSightings);
+    return plants.filter(plant => (plant.sightings_count || 0) >= minCount).length;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-green-50">
@@ -629,6 +654,41 @@ export default function PlantFlashcardApp() {
                   </button>
                 </>
               )}
+            </div>
+            
+            {/* Sightings Filter */}
+            <div className="flex items-center gap-2 mb-3">
+              <Eye className="w-4 h-4 text-gray-600" />
+              <div className="flex gap-2">
+                <Button
+                  variant={sightingsFilter === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSightingsFilter('all')}
+                >
+                  All ({getSightingsCount('all')})
+                </Button>
+                <Button
+                  variant={sightingsFilter === '1' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSightingsFilter('1')}
+                >
+                  1+ ({getSightingsCount('1')})
+                </Button>
+                <Button
+                  variant={sightingsFilter === '2' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSightingsFilter('2')}
+                >
+                  2+ ({getSightingsCount('2')})
+                </Button>
+                <Button
+                  variant={sightingsFilter === '3' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSightingsFilter('3')}
+                >
+                  3+ ({getSightingsCount('3')})
+                </Button>
+              </div>
             </div>
             
             {collections.length > 0 && (
