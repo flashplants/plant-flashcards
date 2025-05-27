@@ -288,6 +288,9 @@ function DashboardContent() {
               id,
               path,
               is_primary
+            ),
+            collection_plants!inner (
+              collection_id
             )
           `);
         // Improved search logic
