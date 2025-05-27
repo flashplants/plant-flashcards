@@ -18,7 +18,8 @@ import {
   Maximize2,
   Minimize2,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
@@ -843,6 +844,16 @@ export default function PlantFlashcardApp() {
                 >
                   <RefreshCw className="w-5 h-5" />
                 </button>
+                <a
+                  href={`/plants/${currentPlant.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors text-gray-600"
+                  title="View plant details"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="w-5 h-5" />
+                </a>
                 <button
                   onClick={toggleFullscreen}
                   className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
