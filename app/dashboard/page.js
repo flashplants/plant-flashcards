@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { debounce } from 'lodash';
 import { supabase } from '../lib/supabase';
@@ -93,7 +93,7 @@ const getCollectionName = (id, allCollections) => {
   return col ? col.name : 'Collection';
 };
 
-export default function PlantsDashboard() {
+function DashboardContent() {
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1229,5 +1229,13 @@ export default function PlantsDashboard() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function PlantsDashboard() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 } 

@@ -19,7 +19,7 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['lucide-react'],
   experimental: {
-    optimizePackageImports: false,
+    optimizePackageImports: ['lucide-react'],
   },
 }
 
