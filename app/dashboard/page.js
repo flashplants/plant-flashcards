@@ -69,6 +69,25 @@ const generateSuffix = () => {
   return Math.random().toString(36).substring(2, 6);
 };
 
+// Add this helper function near the top with other helper functions
+const generateSlug = async (name, existingCollections = []) => {
+  let baseSlug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  
+  // Check if the slug already exists
+  let slug = baseSlug;
+  let counter = 1;
+  
+  while (existingCollections.some(c => c.slug === slug)) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+  
+  return slug;
+};
+
 function buildFullPlantName(plant) {
   // Build the name parts array
   let nameParts = [];
@@ -849,12 +868,15 @@ function DashboardContent() {
         return;
       }
 
+      const slug = await generateSlug(newCollection.name, collections);
+
       const { data, error } = await supabase
         .from('collections')
         .insert([{
           ...newCollection,
           is_published: Boolean(newCollection.is_published),
-          user_id: authUser.id
+          user_id: authUser.id,
+          slug: slug
         }])
         .select()
         .single();
@@ -885,12 +907,19 @@ function DashboardContent() {
         return;
       }
 
+      // Only generate a new slug if the name has changed
+      const existingCollection = collections.find(c => c.id === collection.id);
+      const slug = existingCollection?.name !== collection.name 
+        ? await generateSlug(collection.name, collections.filter(c => c.id !== collection.id))
+        : existingCollection.slug;
+
       const { error } = await supabase
         .from('collections')
         .update({
           name: collection.name,
           description: collection.description || '',
-          is_published: Boolean(collection.is_published)
+          is_published: Boolean(collection.is_published),
+          slug: slug
         })
         .eq('id', collection.id);
 
@@ -899,7 +928,8 @@ function DashboardContent() {
       // Ensure the updated collection has the correct boolean value
       const formattedCollection = {
         ...collection,
-        is_published: Boolean(collection.is_published)
+        is_published: Boolean(collection.is_published),
+        slug: slug
       };
 
       setCollections(prev => prev.map(c => 
@@ -1106,7 +1136,11 @@ function DashboardContent() {
                               }`}>
                                 {collection.is_published ? 'Published' : 'Draft'}
                               </span>
-                              {collection.user_id === authUser?.id && (
+                              {isAdmin ? (
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                                  Admin Collection
+                                </span>
+                              ) : (
                                 <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                                   My Collection
                                 </span>
