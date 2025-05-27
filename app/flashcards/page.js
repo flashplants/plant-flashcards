@@ -16,7 +16,9 @@ import {
   Image,
   File,
   Maximize2,
-  Minimize2
+  Minimize2,
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
@@ -149,6 +151,7 @@ export default function PlantFlashcardApp() {
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
   const [sightingsFilter, setSightingsFilter] = useState('all');
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
   const { user, isAuthenticated } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
@@ -599,6 +602,16 @@ export default function PlantFlashcardApp() {
     };
   }, []);
 
+  const refreshImage = (e) => {
+    // Prevent the click from propagating to the card
+    e.stopPropagation();
+    
+    const currentPlant = displayPlants[currentIndex];
+    if (currentPlant) {
+      setCurrentImageUrl(getImageUrl(currentPlant));
+    }
+  };
+
   if (loading || isFiltering) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-green-50">
@@ -662,124 +675,145 @@ export default function PlantFlashcardApp() {
         <div className={`max-w-4xl mx-auto ${isFullscreen ? 'w-full max-w-6xl' : ''}`}>
           {/* Filters */}
           {!isFullscreen && (
-            <div className="mb-6 bg-white rounded-lg shadow-md p-4">
-              <div className="flex flex-wrap gap-2 mb-3">
-                <button
-                  onClick={() => {
-                    setFilterMode('all');
-                    setSelectedCollection(null);
-                  }}
-                  className={`px-3 py-1 rounded-md ${
-                    filterMode === 'all' && !selectedCollection
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
-                  All Plants ({plants.length})
-                </button>
-                {user && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setFilterMode('favorites');
-                        setSelectedCollection(null);
-                      }}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                        filterMode === 'favorites'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
-                    >
-                      <Star className="w-4 h-4" />
-                      Favorites ({favorites.size})
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFilterMode('sightings');
-                        setSelectedCollection(null);
-                      }}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                        filterMode === 'sightings'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
-                    >
-                      <Eye className="w-4 h-4" />
-                      My Sightings
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFilterMode('testable');
-                        setSelectedCollection(null);
-                      }}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                        filterMode === 'testable'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
-                    >
-                      <Check className="w-4 h-4" />
-                      Test Me
-                    </button>
-                  </>
-                )}
-              </div>
-              
-              {/* Sightings Filter */}
-              <div className="flex items-center gap-2 mb-3">
-                <Eye className="w-4 h-4 text-gray-600" />
-                <div className="flex gap-2">
-                  <Button
-                    variant={sightingsFilter === 'all' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSightingsFilter('all')}
-                  >
-                    All ({getSightingsCount('all')})
-                  </Button>
-                  <Button
-                    variant={sightingsFilter === '1' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSightingsFilter('1')}
-                  >
-                    1+ ({getSightingsCount('1')})
-                  </Button>
-                  <Button
-                    variant={sightingsFilter === '2' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSightingsFilter('2')}
-                  >
-                    2+ ({getSightingsCount('2')})
-                  </Button>
-                  <Button
-                    variant={sightingsFilter === '3' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSightingsFilter('3')}
-                  >
-                    3+ ({getSightingsCount('3')})
-                  </Button>
-                </div>
-              </div>
-              
-              {collections.length > 0 && (
+            <div className="mb-6 bg-white rounded-lg shadow-md overflow-hidden">
+              <button
+                onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
+                className="w-full px-4 py-2 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+              >
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-600" />
-                  <select
-                    value={selectedCollection || ''}
-                    onChange={(e) => {
-                      setSelectedCollection(e.target.value || null);
-                      setFilterMode('collection');
-                    }}
-                    className="flex-1 p-2 border rounded-md"
-                  >
-                    <option value="">Select a collection...</option>
-                    {collections.map(col => (
-                      <option key={col.id} value={col.id}>
-                        {col.name} {col.user_id === user?.id && '(My Collection)'}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="font-medium text-gray-700">Filters</span>
                 </div>
-              )}
+                <ChevronDown 
+                  className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
+                    isFiltersExpanded ? 'rotate-0' : '-rotate-90'
+                  }`}
+                />
+              </button>
+              
+              <div className={`transition-all duration-300 ease-in-out ${
+                isFiltersExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+              }`}>
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <button
+                      onClick={() => {
+                        setFilterMode('all');
+                        setSelectedCollection(null);
+                      }}
+                      className={`px-3 py-1 rounded-md ${
+                        filterMode === 'all' && !selectedCollection
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300'
+                      }`}
+                    >
+                      All Plants ({plants.length})
+                    </button>
+                    {user && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setFilterMode('favorites');
+                            setSelectedCollection(null);
+                          }}
+                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
+                            filterMode === 'favorites'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300'
+                          }`}
+                        >
+                          <Star className="w-4 h-4" />
+                          Favorites ({favorites.size})
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFilterMode('sightings');
+                            setSelectedCollection(null);
+                          }}
+                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
+                            filterMode === 'sightings'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300'
+                          }`}
+                        >
+                          <Eye className="w-4 h-4" />
+                          My Sightings
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFilterMode('testable');
+                            setSelectedCollection(null);
+                          }}
+                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
+                            filterMode === 'testable'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300'
+                          }`}
+                        >
+                          <Check className="w-4 h-4" />
+                          Test Me
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Sightings Filter */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Eye className="w-4 h-4 text-gray-600" />
+                    <div className="flex gap-2">
+                      <Button
+                        variant={sightingsFilter === 'all' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSightingsFilter('all')}
+                      >
+                        All ({getSightingsCount('all')})
+                      </Button>
+                      <Button
+                        variant={sightingsFilter === '1' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSightingsFilter('1')}
+                      >
+                        1+ ({getSightingsCount('1')})
+                      </Button>
+                      <Button
+                        variant={sightingsFilter === '2' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSightingsFilter('2')}
+                      >
+                        2+ ({getSightingsCount('2')})
+                      </Button>
+                      <Button
+                        variant={sightingsFilter === '3' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSightingsFilter('3')}
+                      >
+                        3+ ({getSightingsCount('3')})
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {collections.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-gray-600" />
+                      <select
+                        value={selectedCollection || ''}
+                        onChange={(e) => {
+                          setSelectedCollection(e.target.value || null);
+                          setFilterMode('collection');
+                        }}
+                        className="flex-1 p-2 border rounded-md"
+                      >
+                        <option value="">Select a collection...</option>
+                        {collections.map(col => (
+                          <option key={col.id} value={col.id}>
+                            {col.name} {col.user_id === user?.id && '(My Collection)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -802,6 +836,13 @@ export default function PlantFlashcardApp() {
                     <Star className={`w-5 h-5 ${favorites.has(currentPlant.id) ? 'fill-current' : ''}`} />
                   </button>
                 )}
+                <button
+                  onClick={refreshImage}
+                  className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors text-gray-600"
+                  title="Show different image"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
                 <button
                   onClick={toggleFullscreen}
                   className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
