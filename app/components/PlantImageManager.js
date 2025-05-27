@@ -1,7 +1,10 @@
+'use client';
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, X, CheckCircle, Image as ImageIcon, File, Star, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '../contexts/AuthContext';
 
 // Simple Progress component
 const Progress = ({ value, className }) => (
@@ -53,7 +56,8 @@ function buildFilename({ genus, specific_epithet, infraspecies_rank, variety, cu
     .toLowerCase();
 }
 
-const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infraspecies_rank, variety, cultivar, supabase, onImagesChange }) => {
+const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infraspecies_rank, variety, cultivar, onImagesChange }) => {
+  const { supabase } = useAuth();
   const [existingImages, setExistingImages] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
   const [dragActive, setDragActive] = useState(false);

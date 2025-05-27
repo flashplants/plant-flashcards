@@ -1078,7 +1078,6 @@ function DashboardContent() {
                                 infraspecies_rank={editingPlant.infraspecies_rank}
                                 variety={editingPlant.variety}
                                 cultivar={editingPlant.cultivar}
-                                supabase={supabase}
                                 onImagesChange={() => fetchPlants()}
                               />
                             </div>
