@@ -67,6 +67,10 @@ export default function PlantFlashcardApp() {
   const [showSessionSummary, setShowSessionSummary] = useState(false);
   const [incorrectPlants, setIncorrectPlants] = useState([]);
   const [studyAgainMode, setStudyAgainMode] = useState(false);
+  const [needPractice, setNeedPractice] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [mySightingsOnly, setMySightingsOnly] = useState(false);
+  const [testableOnly, setTestableOnly] = useState(false);
 
   // Memoize fetchUserData to prevent recreation on every render
   const fetchUserData = async () => {
@@ -110,21 +114,42 @@ export default function PlantFlashcardApp() {
     fetchPlants();
   }, []);
 
-  // Update filtered plants when dependencies change
+  // Refactored composable filtering logic
   useEffect(() => {
     if (plants.length === 0) return;
 
     const applyFilters = async () => {
       setIsFiltering(true);
       try {
-        if (selectedCollection) {
-          await fetchCollectionPlants(selectedCollection);
-          return;
-        }
-
         let filtered = [...plants];
 
-        // Apply sightings filter first
+        // 1. Collection filter
+        if (selectedCollection) {
+          const { data, error } = await supabase
+            .from('collection_plants')
+            .select(`
+              plant_id,
+              plants (
+                *,
+                plant_images (
+                  id,
+                  path,
+                  is_primary
+                ),
+                global_sighting_counts (
+                  sighting_count
+                )
+              )
+            `)
+            .eq('collection_id', selectedCollection)
+            .eq('plants.is_published', true);
+          if (error) throw error;
+          filtered = (data || [])
+            .map(cp => cp.plants)
+            .filter(Boolean);
+        }
+
+        // 2. Sightings filter
         if (sightingsFilter !== 'all') {
           const minSightings = parseInt(sightingsFilter);
           filtered = filtered.filter(plant => {
@@ -133,37 +158,82 @@ export default function PlantFlashcardApp() {
           });
         }
 
-        // Then apply other filters
-        switch (filterMode) {
-          case 'favorites':
-            if (isAuthenticated) {
-              filtered = filtered.filter(p => favorites.has(p.id));
-            } else {
-              setShowAuth(true);
-              setFilterMode('all');
+        // 3. Favorites filter (toggle)
+        if (favoritesOnly) {
+          if (isAuthenticated) {
+            filtered = filtered.filter(p => favorites.has(p.id));
+          } else {
+            setShowAuth(true);
+            setFavoritesOnly(false);
+            setIsFiltering(false);
+            return;
+          }
+        }
+
+        // 4. My Sightings filter (toggle)
+        if (mySightingsOnly) {
+          if (isAuthenticated) {
+            const { data: sightingsData, error: sightingsError } = await supabase
+              .from('sightings')
+              .select('plant_id')
+              .eq('user_id', user.id);
+            if (sightingsError) {
+              console.error('Sightings data error:', sightingsError);
+              setFilteredPlants([]);
+              setIsFiltering(false);
               return;
             }
-            break;
-          case 'sightings':
-            if (isAuthenticated) {
-              await fetchUserSightings();
-              return;
-            } else {
-              setShowAuth(true);
-              setFilterMode('all');
+            const sightingIds = (sightingsData || []).map(s => s.plant_id);
+            filtered = filtered.filter(p => sightingIds.includes(p.id));
+          } else {
+            setShowAuth(true);
+            setMySightingsOnly(false);
+            setIsFiltering(false);
+            return;
+          }
+        }
+
+        // 5. Testable filter (toggle)
+        if (testableOnly) {
+          if (isAuthenticated) {
+            const { data: testableData, error: testableError } = await supabase
+              .from('sightings')
+              .select('plant_id')
+              .eq('user_id', user.id)
+              .eq('is_testable', true);
+            if (testableError) {
+              console.error('Testable data error:', testableError);
+              setFilteredPlants([]);
+              setIsFiltering(false);
               return;
             }
-            break;
-          case 'testable':
-            if (isAuthenticated) {
-              await fetchTestablePlants();
-              return;
-            } else {
-              setShowAuth(true);
-              setFilterMode('all');
-              return;
-            }
-            break;
+            const testableIds = (testableData || []).map(s => s.plant_id);
+            filtered = filtered.filter(p => testableIds.includes(p.id));
+          } else {
+            setShowAuth(true);
+            setTestableOnly(false);
+            setIsFiltering(false);
+            return;
+          }
+        }
+
+        // 6. Need Practice filter
+        if (needPractice && user) {
+          const { data: practiceData, error: practiceError } = await supabase
+            .rpc('get_plants_needing_practice', {
+              user_uuid: user.id,
+              min_attempts: 3,
+              success_threshold: 70.0,
+              days_ago: 30
+            });
+          if (practiceError) {
+            console.error('Practice data error:', practiceError);
+            setFilteredPlants([]);
+            setIsFiltering(false);
+            return;
+          }
+          const practiceIds = (practiceData || []).map(p => p.plant_id);
+          filtered = filtered.filter(p => practiceIds.includes(p.id));
         }
 
         setFilteredPlants(filtered);
@@ -176,15 +246,7 @@ export default function PlantFlashcardApp() {
     };
 
     applyFilters();
-  }, [filterMode, selectedCollection, plants, isAuthenticated, sightingsFilter]);
-
-  // Separate effect for favorites to prevent unnecessary re-filtering
-  useEffect(() => {
-    if (filterMode === 'favorites' && isAuthenticated) {
-      const filtered = plants.filter(p => favorites.has(p.id));
-      setFilteredPlants(filtered);
-    }
-  }, [favorites, filterMode, isAuthenticated, plants]);
+  }, [selectedCollection, plants, isAuthenticated, sightingsFilter, needPractice, favoritesOnly, mySightingsOnly, testableOnly, favorites, user]);
 
   // Fetch user data when user changes
   useEffect(() => {
@@ -731,11 +793,14 @@ export default function PlantFlashcardApp() {
                   <div className="flex flex-wrap gap-2 mb-3">
                     <button
                       onClick={() => {
-                        setFilterMode('all');
                         setSelectedCollection(null);
+                        setNeedPractice(false);
+                        setFavoritesOnly(false);
+                        setMySightingsOnly(false);
+                        setTestableOnly(false);
                       }}
                       className={`px-3 py-1 rounded-md ${
-                        filterMode === 'all' && !selectedCollection
+                        !selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly
                           ? 'bg-green-600 text-white'
                           : 'bg-gray-200 hover:bg-gray-300'
                       }`}
@@ -745,58 +810,49 @@ export default function PlantFlashcardApp() {
                     {user && (
                       <>
                         <button
-                          onClick={() => {
-                            setFilterMode('favorites');
-                            setSelectedCollection(null);
-                          }}
+                          onClick={() => setFavoritesOnly((prev) => !prev)}
                           className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            filterMode === 'favorites'
+                            favoritesOnly
                               ? 'bg-green-600 text-white'
                               : 'bg-gray-200 hover:bg-gray-300'
                           }`}
+                          aria-pressed={favoritesOnly}
                         >
                           <Star className="w-4 h-4" />
                           Favorites ({favorites.size})
                         </button>
                         <button
-                          onClick={() => {
-                            setFilterMode('sightings');
-                            setSelectedCollection(null);
-                          }}
+                          onClick={() => setMySightingsOnly((prev) => !prev)}
                           className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            filterMode === 'sightings'
+                            mySightingsOnly
                               ? 'bg-green-600 text-white'
                               : 'bg-gray-200 hover:bg-gray-300'
                           }`}
+                          aria-pressed={mySightingsOnly}
                         >
                           <Eye className="w-4 h-4" />
                           My Sightings
                         </button>
                         <button
-                          onClick={() => {
-                            setFilterMode('testable');
-                            setSelectedCollection(null);
-                          }}
+                          onClick={() => setTestableOnly((prev) => !prev)}
                           className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            filterMode === 'testable'
+                            testableOnly
                               ? 'bg-green-600 text-white'
                               : 'bg-gray-200 hover:bg-gray-300'
                           }`}
+                          aria-pressed={testableOnly}
                         >
                           <Check className="w-4 h-4" />
                           Test Me
                         </button>
                         <button
-                          onClick={() => {
-                            setFilterMode('practice');
-                            setSelectedCollection(null);
-                            fetchPlantsNeedingPractice();
-                          }}
+                          onClick={() => setNeedPractice((prev) => !prev)}
                           className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            filterMode === 'practice'
+                            needPractice
                               ? 'bg-green-600 text-white'
                               : 'bg-gray-200 hover:bg-gray-300'
                           }`}
+                          aria-pressed={needPractice}
                         >
                           <RefreshCw className="w-4 h-4" />
                           Need Practice
