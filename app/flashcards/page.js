@@ -63,6 +63,10 @@ export default function PlantFlashcardApp() {
   const { user, isAuthenticated } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [showSessionSummary, setShowSessionSummary] = useState(false);
+  const [incorrectPlants, setIncorrectPlants] = useState([]);
+  const [studyAgainMode, setStudyAgainMode] = useState(false);
 
   // Memoize fetchUserData to prevent recreation on every render
   const fetchUserData = async () => {
@@ -330,6 +334,80 @@ export default function PlantFlashcardApp() {
     }
   };
 
+  const fetchPlantsNeedingPractice = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('Fetching plants needing practice for user:', user.id);
+      
+      // First, get the plants that need practice
+      const { data: practiceData, error: practiceError } = await supabase
+        .rpc('get_plants_needing_practice', {
+          user_uuid: user.id,
+          min_attempts: 3,
+          success_threshold: 70.0,
+          days_ago: 30
+        });
+
+      if (practiceError) {
+        console.error('Practice data error:', practiceError);
+        throw new Error(`Failed to fetch practice data: ${practiceError.message}`);
+      }
+
+      console.log('Practice data received:', practiceData);
+
+      if (!practiceData || practiceData.length === 0) {
+        console.log('No plants need practice');
+        setFilteredPlants([]);
+        return;
+      }
+
+      // Get the plant IDs from the practice data
+      const plantIds = practiceData.map(p => p.plant_id);
+      console.log('Plant IDs to fetch:', plantIds);
+
+      // Fetch the full plant data
+      const { data: plantsData, error: plantsError } = await supabase
+        .from('plants')
+        .select(`
+          *,
+          plant_images (
+            id,
+            path,
+            is_primary
+          ),
+          global_sighting_counts (
+            sighting_count
+          )
+        `)
+        .in('id', plantIds)
+        .eq('is_published', true);
+
+      if (plantsError) {
+        console.error('Plants data error:', plantsError);
+        throw new Error(`Failed to fetch plant data: ${plantsError.message}`);
+      }
+
+      console.log('Plants data received:', plantsData);
+
+      if (plantsData) {
+        // Sort plants according to the order from get_plants_needing_practice
+        const sortedPlants = plantIds.map(id => 
+          plantsData.find(p => p.id === id)
+        ).filter(Boolean);
+
+        console.log('Sorted plants:', sortedPlants);
+        setFilteredPlants(shuffleArray(sortedPlants));
+      } else {
+        console.log('No plant data received');
+        setFilteredPlants([]);
+      }
+    } catch (error) {
+      console.error('Error in fetchPlantsNeedingPractice:', error);
+      setError(`Failed to load plants needing practice: ${error.message}`);
+    }
+  };
+
   const shuffleArray = (array) => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -424,15 +502,57 @@ export default function PlantFlashcardApp() {
     setShowAnswer(!showAnswer);
   };
 
-  const markAnswer = (correct) => {
+  const markAnswer = async (correct) => {
     if (!answered.has(currentIndex)) {
       setAnswered(new Set([...answered, currentIndex]));
       setStats(prev => ({
         ...prev,
         [correct ? 'correct' : 'incorrect']: prev[correct ? 'correct' : 'incorrect'] + 1
       }));
+
+      // Record the answer in the database
+      if (user && sessionId) {
+        try {
+          await supabase
+            .from('flashcard_answers')
+            .insert({
+              user_id: user.id,
+              plant_id: displayPlants[currentIndex].id,
+              is_correct: correct,
+              session_id: sessionId
+            });
+        } catch (error) {
+          console.error('Error recording answer:', error);
+        }
+      }
+
+      // If this was incorrect, add to incorrect plants
+      if (!correct) {
+        setIncorrectPlants(prev => [...prev, displayPlants[currentIndex]]);
+      }
+
+      // Check if this was the last card
+      if (answered.size + 1 === displayPlants.length) {
+        setTimeout(() => setShowSessionSummary(true), 300);
+      } else {
+        setTimeout(nextCard, 300);
+      }
     }
-    setTimeout(nextCard, 300);
+  };
+
+  const startNewSession = (useIncorrectOnly = false) => {
+    setSessionId(crypto.randomUUID());
+    setShowSessionSummary(false);
+    setStats({ correct: 0, incorrect: 0 });
+    setAnswered(new Set());
+    setIncorrectPlants([]);
+    
+    if (useIncorrectOnly && incorrectPlants.length > 0) {
+      setFilteredPlants(shuffleArray([...incorrectPlants]));
+      setCurrentIndex(0);
+    } else {
+      resetSession();
+    }
   };
 
   const resetSession = () => {
@@ -519,6 +639,11 @@ export default function PlantFlashcardApp() {
       setCurrentImageUrl(getImageUrl(currentPlant));
     }
   };
+
+  // Initialize session ID when component mounts
+  useEffect(() => {
+    setSessionId(crypto.randomUUID());
+  }, []);
 
   if (loading || isFiltering) {
     return (
@@ -660,6 +785,21 @@ export default function PlantFlashcardApp() {
                         >
                           <Check className="w-4 h-4" />
                           Test Me
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFilterMode('practice');
+                            setSelectedCollection(null);
+                            fetchPlantsNeedingPractice();
+                          }}
+                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
+                            filterMode === 'practice'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300'
+                          }`}
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Need Practice
                         </button>
                       </>
                     )}
@@ -923,6 +1063,69 @@ export default function PlantFlashcardApp() {
         </div>
       </main>
       {!isFullscreen && <Footer />}
+
+      {/* Session Summary Modal */}
+      {showSessionSummary && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Study Session Summary</h2>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Total Cards:</span>
+                <span className="font-semibold">{displayPlants.length}</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Correct Answers:</span>
+                <span className="font-semibold text-green-600">{stats.correct}</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Incorrect Answers:</span>
+                <span className="font-semibold text-red-600">{stats.incorrect}</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Accuracy:</span>
+                <span className="font-semibold">
+                  {Math.round((stats.correct / displayPlants.length) * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {incorrectPlants.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Plants to Review:</h3>
+                <ul className="space-y-2">
+                  {incorrectPlants.map(plant => (
+                    <li key={plant.id} className="text-gray-600">
+                      {renderPlantName(plant)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-8 flex justify-end gap-4">
+              <button
+                onClick={() => startNewSession(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                New Session
+              </button>
+              {incorrectPlants.length > 0 && (
+                <button
+                  onClick={() => startNewSession(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Study Incorrect Answers
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
