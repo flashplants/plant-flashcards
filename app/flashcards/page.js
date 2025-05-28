@@ -9,6 +9,7 @@ import {
   X,
   Star,
   Eye,
+  Globe,
   EyeOff,
   Filter,
   User,
@@ -19,7 +20,9 @@ import {
   Minimize2,
   ChevronDown,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Leaf,
+  CircleDashed
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
@@ -28,6 +31,7 @@ import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
 import { Button } from "@/components/ui/button";
 import { buildFullPlantName, renderPlantName } from '../utils/plantNameUtils';
+import { Badge } from "@/components/ui/badge";
 
 // Debounce function
 const debounce = (func, wait) => {
@@ -90,7 +94,7 @@ export default function PlantFlashcardApp() {
 
       // Fetch collections
       const { data: collData } = await supabase
-        .from('collections')
+        .from('collections_with_count')
         .select('*')
         .or(`user_id.eq.${user.id},is_published.eq.true`)
         .order('name');
@@ -707,6 +711,19 @@ export default function PlantFlashcardApp() {
     setSessionId(crypto.randomUUID());
   }, []);
 
+  // Helper functions for badge counts
+  const getFavoritesCount = () => filteredPlants.filter(p => favorites.has(p.id)).length;
+  const getMySightingsCount = () => filteredPlants.filter(p => p.sightings_count > 0).length;
+  const getTestableCount = () => filteredPlants.filter(p => p.is_testable).length;
+  const getNeedPracticeCount = () => filteredPlants.length; // Optionally, you can refine this if you want only those that need practice
+  const getAllPlantsCount = () => filteredPlants.length;
+
+  // Helper to get the correct plant count for a collection
+  const getCollectionPlantCount = (col) => {
+    if (typeof col.published_plant_count === 'number') return col.published_plant_count;
+    return 0;
+  };
+
   if (loading || isFiltering) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-green-50">
@@ -791,7 +808,7 @@ export default function PlantFlashcardApp() {
               }`}>
                 <div className="p-4">
                   <div className="flex flex-wrap gap-2 mb-3">
-                    <button
+                    <Button
                       onClick={() => {
                         setSelectedCollection(null);
                         setNeedPractice(false);
@@ -799,121 +816,112 @@ export default function PlantFlashcardApp() {
                         setMySightingsOnly(false);
                         setTestableOnly(false);
                       }}
-                      className={`px-3 py-1 rounded-md ${
-                        !selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
+                      variant={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'default' : 'outline'}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                      aria-pressed={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly}
                     >
-                      All Plants ({plants.length})
-                    </button>
+                      <Leaf className="w-4 h-4" />
+                      All Plants
+                      <Badge className="ml-2 bg-green-600 text-white font-semibold">{plants.length}</Badge>
+                    </Button>
                     {user && (
                       <>
-                        <button
+                        <Button
                           onClick={() => setFavoritesOnly((prev) => !prev)}
-                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            favoritesOnly
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
+                          variant={favoritesOnly ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${favoritesOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
                           aria-pressed={favoritesOnly}
                         >
                           <Star className="w-4 h-4" />
-                          Favorites ({favorites.size})
-                        </button>
-                        <button
+                          Favorites
+                          <Badge className="ml-2 bg-green-600 text-white font-semibold">{getFavoritesCount()}</Badge>
+                        </Button>
+                        <Button
                           onClick={() => setMySightingsOnly((prev) => !prev)}
-                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            mySightingsOnly
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
+                          variant={mySightingsOnly ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
                           aria-pressed={mySightingsOnly}
                         >
                           <Eye className="w-4 h-4" />
                           My Sightings
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => setTestableOnly((prev) => !prev)}
-                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            testableOnly
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
+                          variant={testableOnly ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
                           aria-pressed={testableOnly}
                         >
                           <Check className="w-4 h-4" />
                           Test Me
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => setNeedPractice((prev) => !prev)}
-                          className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                            needPractice
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
+                          variant={needPractice ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${needPractice ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
                           aria-pressed={needPractice}
                         >
-                          <RefreshCw className="w-4 h-4" />
+                          <CircleDashed className="w-4 h-4" />
                           Need Practice
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>
                   
                   {/* Sightings Filter */}
                   <div className="flex items-center gap-2 mb-3">
-                    <Eye className="w-4 h-4 text-gray-600" />
+                    <Globe className="w-4 h-4 text-gray-600" />
                     <div className="flex gap-2">
                       <Button
                         variant={sightingsFilter === 'all' ? 'default' : 'outline'}
-                        size="sm"
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={sightingsFilter === 'all'}
                         onClick={() => setSightingsFilter('all')}
                       >
-                        All ({getSightingsCount('all')})
+                        All
                       </Button>
                       <Button
                         variant={sightingsFilter === '1' ? 'default' : 'outline'}
-                        size="sm"
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={sightingsFilter === '1'}
                         onClick={() => setSightingsFilter('1')}
                       >
-                        1+ ({getSightingsCount('1')})
+                        1+
                       </Button>
                       <Button
                         variant={sightingsFilter === '2' ? 'default' : 'outline'}
-                        size="sm"
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={sightingsFilter === '2'}
                         onClick={() => setSightingsFilter('2')}
                       >
-                        2+ ({getSightingsCount('2')})
+                        2+
                       </Button>
                       <Button
                         variant={sightingsFilter === '3' ? 'default' : 'outline'}
-                        size="sm"
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={sightingsFilter === '3'}
                         onClick={() => setSightingsFilter('3')}
                       >
-                        3+ ({getSightingsCount('3')})
+                        3+
                       </Button>
                     </div>
                   </div>
                   
                   {collections.length > 0 && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-3">
                       <Filter className="w-4 h-4 text-gray-600" />
-                      <select
-                        value={selectedCollection || ''}
-                        onChange={(e) => {
-                          setSelectedCollection(e.target.value || null);
-                          setFilterMode('collection');
-                        }}
-                        className="flex-1 p-2 border rounded-md"
-                      >
-                        <option value="">Select a collection...</option>
+                      <div className="flex flex-wrap gap-2">
                         {collections.map(col => (
-                          <option key={col.id} value={col.id}>
-                            {col.name} {col.user_id === user?.id && '(My Collection)'}
-                          </option>
+                          <Button
+                            key={col.id}
+                            variant={selectedCollection === col.id ? 'default' : 'outline'}
+                            onClick={() => setSelectedCollection(selectedCollection === col.id ? null : col.id)}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                          >
+                            <span>{col.name} {col.user_id === user?.id && <span className="text-xs text-gray-400">(My Collection)</span>}</span>
+                            <Badge className="ml-2 bg-green-600 text-white font-semibold">{getCollectionPlantCount(col)}</Badge>
+                          </Button>
                         ))}
-                      </select>
+                      </div>
                     </div>
                   )}
                 </div>
