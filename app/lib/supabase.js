@@ -11,13 +11,13 @@ const getSiteUrl = () => {
   return 'https://plant-flashcards.vercel.app';
 };
 
+// Create a single instance of the Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
+    flowType: 'pkce',
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'pkce',
-    debug: true,
-    redirectTo: `${getSiteUrl()}/auth/callback`
+    persistSession: true,
+    redirectTo: 'https://dkupdfjpymlsspxehajc.supabase.co/auth/v1/callback'
   }
 }) 

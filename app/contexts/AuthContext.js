@@ -62,14 +62,11 @@ export function AuthProvider({ children }) {
   };
 
   const signUp = async (email, password) => {
-    const redirectUrl = new URL('/auth/callback', window.location.origin)
-    redirectUrl.searchParams.set('next', window.location.pathname)
-    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl.toString()
+        emailRedirectTo: `${window.location.origin}/auth/callback`
       }
     });
     if (error) throw error;
@@ -87,28 +84,27 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: 'https://dkupdfjpymlsspxehajc.supabase.co/auth/v1/callback',
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
-          },
-          skipBrowserRedirect: true
+            prompt: 'consent'
+          }
         }
-      });
-      
-      if (error) throw error;
-      
-      // Handle the redirect manually
-      if (data?.url) {
-        window.location.href = data.url;
+      })
+
+      if (error) {
+        console.error('Error signing in with Google:', error)
+        throw error
       }
-      
-      return data;
+
+      if (data?.url) {
+        window.location.href = data.url
+      }
     } catch (error) {
-      console.error('Error signing in with Google:', error);
-      throw error;
+      console.error('Error in signInWithGoogle:', error)
+      throw error
     }
-  };
+  }
 
   const value = {
     user,
