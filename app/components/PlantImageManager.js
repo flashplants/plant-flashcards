@@ -18,6 +18,17 @@ const Progress = ({ value, className }) => (
 
 // Helper function to convert image to WebP
 const convertToWebP = async (file) => {
+  if (file.type === 'image/heic' || file.type === 'image/heif') {
+    // Use heic2any to convert directly to WebP
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const webpBlob = await heic2any({ blob: file, toType: 'image/webp', quality: 0.8 });
+      return webpBlob;
+    } catch (err) {
+      throw new Error('Failed to convert HEIC/HEIF to WebP: ' + err.message);
+    }
+  }
+  // Existing logic for other types
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
@@ -157,12 +168,18 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
   };
 
   // Upload single file
-  const uploadFile = async (fileObj) => {
+  const uploadFile = async (fileObj, isPrimary = false) => {
     try {
       updateFileStatus(fileObj.id, 'processing', 10);
-
-      const webpBlob = await convertToWebP(fileObj.file);
-      updateFileStatus(fileObj.id, 'processing', 40);
+      let webpBlob;
+      try {
+        webpBlob = await convertToWebP(fileObj.file);
+        updateFileStatus(fileObj.id, 'processing', 40);
+      } catch (err) {
+        console.error(`[Image Upload] Conversion failed for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, err.message, err.stack);
+        updateFileStatus(fileObj.id, 'error', 0, `Conversion failed: ${err.message}`);
+        return { success: false, error: `Conversion failed: ${err.message}` };
+      }
 
       const baseName = buildFilename({ genus, specific_epithet, infraspecies_rank, variety, cultivar });
       const suffix = generateSuffix();
@@ -170,38 +187,44 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
       const storagePath = `${plantId}/${fileName}`;
 
       updateFileStatus(fileObj.id, 'uploading', 50);
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('plant-images')
+          .upload(storagePath, webpBlob, {
+            contentType: 'image/webp',
+            cacheControl: '3600'
+          });
+        if (uploadError) throw uploadError;
+        updateFileStatus(fileObj.id, 'uploading', 80);
+      } catch (err) {
+        console.error(`[Image Upload] Storage upload failed for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, err.message, err.stack);
+        updateFileStatus(fileObj.id, 'error', 0, `Storage upload failed: ${err.message}`);
+        return { success: false, error: `Storage upload failed: ${err.message}` };
+      }
 
-      const { error: uploadError } = await supabase.storage
-        .from('plant-images')
-        .upload(storagePath, webpBlob, {
-          contentType: 'image/webp',
-          cacheControl: '3600'
-        });
-
-      if (uploadError) throw uploadError;
-      updateFileStatus(fileObj.id, 'uploading', 80);
-
-      // Set as primary if this is the first image
-      const isPrimary = existingImages.length === 0;
-
-      const { error: dbError } = await supabase
-        .from('plant_images')
-        .insert({
-          plant_id: plantId,
-          filename: fileName,
-          file_size: webpBlob.size,
-          content_type: 'image/webp',
-          is_primary: isPrimary,
-          path: storagePath
-        });
-
-      if (dbError) throw dbError;
-      updateFileStatus(fileObj.id, 'completed', 100);
-
-      return { success: true, fileName };
+      try {
+        const { error: dbError } = await supabase
+          .from('plant_images')
+          .insert({
+            plant_id: plantId,
+            filename: fileName,
+            file_size: webpBlob.size,
+            content_type: 'image/webp',
+            is_primary: isPrimary,
+            path: storagePath
+          });
+        if (dbError) throw dbError;
+        updateFileStatus(fileObj.id, 'completed', 100);
+        return { success: true, fileName };
+      } catch (err) {
+        console.error(`[Image Upload] DB insert failed for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, err.message, err.stack);
+        updateFileStatus(fileObj.id, 'error', 0, `DB insert failed: ${err.message}`);
+        return { success: false, error: `DB insert failed: ${err.message}` };
+      }
     } catch (error) {
-      updateFileStatus(fileObj.id, 'error', 0, error.message);
-      return { success: false, error: error.message };
+      console.error(`[Image Upload] Unexpected error for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, error.message, error.stack);
+      updateFileStatus(fileObj.id, 'error', 0, `Unexpected error: ${error.message}`);
+      return { success: false, error: `Unexpected error: ${error.message}` };
     }
   };
 
@@ -209,8 +232,12 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
   const uploadAllFiles = async () => {
     setUploading(true);
     const pendingFiles = newFiles.filter(file => file.status === 'pending');
+    let primarySet = false;
     for (let i = 0; i < pendingFiles.length; i++) {
-      await uploadFile(pendingFiles[i]);
+      // Only set as primary if this is the first image and there are no existing images
+      const isPrimary = !primarySet && existingImages.length === 0 && i === 0;
+      await uploadFile(pendingFiles[i], isPrimary);
+      if (isPrimary) primarySet = true;
       await loadExistingImages(); // Ensure existingImages is up to date for next upload
     }
     setUploading(false);

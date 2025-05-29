@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, X, CheckCircle, Image as ImageIcon, File } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,17 @@ const Progress = ({ value, className }) => (
 
 // Helper function to convert image to WebP (keeping your existing logic)
 const convertToWebP = async (file) => {
+  if (file.type === 'image/heic' || file.type === 'image/heif') {
+    // Use heic2any to convert directly to WebP
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const webpBlob = await heic2any({ blob: file, toType: 'image/webp', quality: 0.8 });
+      return webpBlob;
+    } catch (err) {
+      throw new Error('Failed to convert HEIC/HEIF to WebP: ' + err.message);
+    }
+  }
+  // Existing logic for other types
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
@@ -56,6 +67,24 @@ const BulkImageUpload = ({ plantId, plantName, onUploadComplete, supabase }) => 
   const [uploadProgress, setUploadProgress] = useState({});
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const [existingImagesCount, setExistingImagesCount] = useState(0);
+
+  // Load existing images count
+  const loadExistingImagesCount = async () => {
+    const { data, error } = await supabase
+      .from('plant_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('plant_id', plantId);
+    if (!error && typeof data?.length === 'number') {
+      setExistingImagesCount(data.length);
+    }
+  };
+
+  useEffect(() => {
+    if (plantId) {
+      loadExistingImagesCount();
+    }
+  }, [plantId]);
 
   // File status: 'pending', 'processing', 'uploading', 'completed', 'error'
   const updateFileStatus = (fileId, status, progress = 0, error = null) => {
@@ -115,52 +144,64 @@ const BulkImageUpload = ({ plantId, plantName, onUploadComplete, supabase }) => 
     setFiles(prev => prev.filter(file => file.id !== fileId));
   };
 
-  const uploadFile = async (fileObj) => {
+  // Modified uploadFile to accept isPrimary argument
+  const uploadFile = async (fileObj, isPrimary = false) => {
     try {
       updateFileStatus(fileObj.id, 'processing', 10);
+      let webpBlob;
+      try {
+        webpBlob = await convertToWebP(fileObj.file);
+        updateFileStatus(fileObj.id, 'processing', 40);
+      } catch (err) {
+        console.error(`[Bulk Image Upload] Conversion failed for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, err.message, err.stack);
+        updateFileStatus(fileObj.id, 'error', 0, `Conversion failed: ${err.message}`);
+        return { success: false, error: `Conversion failed: ${err.message}` };
+      }
 
-      // Convert to WebP
-      const webpBlob = await convertToWebP(fileObj.file);
-      updateFileStatus(fileObj.id, 'processing', 40);
-
-      // Get the plant fields (assume they are passed as props or available)
       const baseName = buildFilename({ genus, specific_epithet, infraspecies_rank, variety, cultivar });
       const suffix = generateSuffix();
       const fileName = `${baseName}-${suffix}.webp`;
       const storagePath = `${plantId}/${fileName}`;
 
       updateFileStatus(fileObj.id, 'uploading', 50);
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('plant-images')
+          .upload(storagePath, webpBlob, {
+            contentType: 'image/webp',
+            cacheControl: '3600'
+          });
+        if (uploadError) throw uploadError;
+        updateFileStatus(fileObj.id, 'uploading', 80);
+      } catch (err) {
+        console.error(`[Bulk Image Upload] Storage upload failed for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, err.message, err.stack);
+        updateFileStatus(fileObj.id, 'error', 0, `Storage upload failed: ${err.message}`);
+        return { success: false, error: `Storage upload failed: ${err.message}` };
+      }
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('plant-images')
-        .upload(storagePath, webpBlob, {
-          contentType: 'image/webp',
-          cacheControl: '3600'
-        });
-
-      if (uploadError) throw uploadError;
-      updateFileStatus(fileObj.id, 'uploading', 80);
-
-      // Create plant_image record
-      const { error: dbError } = await supabase
-        .from('plant_images')
-        .insert({
-          plant_id: plantId,
-          filename: fileName,
-          file_size: webpBlob.size,
-          content_type: 'image/webp',
-          is_primary: false, // or true as needed
-          path: storagePath
-        });
-
-      if (dbError) throw dbError;
-      updateFileStatus(fileObj.id, 'completed', 100);
-
-      return { success: true, fileName };
+      try {
+        const { error: dbError } = await supabase
+          .from('plant_images')
+          .insert({
+            plant_id: plantId,
+            filename: fileName,
+            file_size: webpBlob.size,
+            content_type: 'image/webp',
+            is_primary: isPrimary,
+            path: storagePath
+          });
+        if (dbError) throw dbError;
+        updateFileStatus(fileObj.id, 'completed', 100);
+        return { success: true, fileName };
+      } catch (err) {
+        console.error(`[Bulk Image Upload] DB insert failed for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, err.message, err.stack);
+        updateFileStatus(fileObj.id, 'error', 0, `DB insert failed: ${err.message}`);
+        return { success: false, error: `DB insert failed: ${err.message}` };
+      }
     } catch (error) {
-      updateFileStatus(fileObj.id, 'error', 0, error.message);
-      return { success: false, error: error.message };
+      console.error(`[Bulk Image Upload] Unexpected error for ${fileObj.name} (${fileObj.size} bytes, ${fileObj.file.type}):`, error.message, error.stack);
+      updateFileStatus(fileObj.id, 'error', 0, `Unexpected error: ${error.message}`);
+      return { success: false, error: `Unexpected error: ${error.message}` };
     }
   };
 
@@ -169,11 +210,13 @@ const BulkImageUpload = ({ plantId, plantName, onUploadComplete, supabase }) => 
     
     const pendingFiles = files.filter(file => file.status === 'pending');
     
-    // Upload files in batches of 3 to avoid overwhelming the server
-    const batchSize = 3;
-    for (let i = 0; i < pendingFiles.length; i += batchSize) {
-      const batch = pendingFiles.slice(i, i + batchSize);
-      await Promise.all(batch.map(file => uploadFile(file)));
+    // Determine which file (if any) should be primary
+    let primarySet = false;
+    for (let i = 0; i < pendingFiles.length; i++) {
+      // Only set as primary if this is the first image and there are no existing images
+      const isPrimary = !primarySet && existingImagesCount === 0 && i === 0;
+      await uploadFile(pendingFiles[i], isPrimary);
+      if (isPrimary) primarySet = true;
     }
 
     setUploading(false);
