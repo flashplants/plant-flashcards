@@ -75,6 +75,17 @@ export default function PlantFlashcardApp() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [mySightingsOnly, setMySightingsOnly] = useState(false);
   const [testableOnly, setTestableOnly] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Add mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Memoize fetchUserData to prevent recreation on every render
   const fetchUserData = async () => {
@@ -967,12 +978,18 @@ export default function PlantFlashcardApp() {
                 </a>
                 <button
                   onClick={toggleFullscreen}
-                  className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                  disabled={isMobile}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isMobile 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-600'
+                  }`}
+                  title={isMobile ? "Fullscreen mode is not available on mobile devices" : "Toggle fullscreen"}
                 >
                   {isFullscreen ? (
-                    <Minimize2 className="w-5 h-5 text-gray-600" />
+                    <Minimize2 className="w-5 h-5" />
                   ) : (
-                    <Maximize2 className="w-5 h-5 text-gray-600" />
+                    <Maximize2 className="w-5 h-5" />
                   )}
                 </button>
               </div>
