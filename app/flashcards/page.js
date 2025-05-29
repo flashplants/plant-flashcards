@@ -77,6 +77,11 @@ export default function PlantFlashcardApp() {
   const [testableOnly, setTestableOnly] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Add component mount logging
+  useEffect(() => {
+    console.log('PlantFlashcardApp component mounted');
+  }, []);
+
   // Add mobile detection
   useEffect(() => {
     const checkMobile = () => {
@@ -102,21 +107,46 @@ export default function PlantFlashcardApp() {
       if (favData) {
         setFavorites(new Set(favData.map(f => f.plant_id)));
       }
-
-      // Fetch collections
-      const { data: collData } = await supabase
-        .from('collections_with_count')
-        .select('*')
-        .or(`user_id.eq.${user.id},is_published.eq.true`)
-        .order('name');
-      
-      if (collData) {
-        setCollections(collData);
-      }
     } finally {
       setIsFetchingUserData(false);
     }
   };
+
+  // Fetch collections regardless of authentication status
+  useEffect(() => {
+    console.log('=== COLLECTIONS FETCH START ===');
+    const fetchCollections = async () => {
+      try {
+        console.log('Attempting to fetch collections...');
+        const { data: collData, error } = await supabase
+          .from('collections_with_count')
+          .select('*')
+          .eq('is_published', true)
+          .order('name');
+        
+        console.log('=== COLLECTIONS DATA ===');
+        console.log('Data:', collData);
+        console.log('Error:', error);
+        console.log('=== END COLLECTIONS DATA ===');
+
+        if (error) {
+          console.error('Error fetching collections:', error);
+          return;
+        }
+
+        if (collData) {
+          console.log('Setting collections:', collData);
+          setCollections(collData);
+        } else {
+          console.log('No collections data returned');
+        }
+      } catch (error) {
+        console.error('Error in fetchCollections:', error);
+      }
+    };
+
+    fetchCollections();
+  }, []);
 
   // Debounced version of fetchUserData
   const debouncedFetchUserData = useCallback(
@@ -917,24 +947,32 @@ export default function PlantFlashcardApp() {
                     </div>
                   </div>
                   
-                  {collections.length > 0 && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <Filter className="w-4 h-4 text-gray-600" />
-                      <div className="flex flex-wrap gap-2">
-                        {collections.map(col => (
+                  {/* Collections Filter */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Filter className="w-4 h-4 text-gray-600" />
+                    <div className="flex flex-wrap gap-2">
+                      {console.log('Rendering collections:', collections)}
+                      {collections && collections.length > 0 ? (
+                        collections.map(col => (
                           <Button
                             key={col.id}
                             variant={selectedCollection === col.id ? 'default' : 'outline'}
                             onClick={() => setSelectedCollection(selectedCollection === col.id ? null : col.id)}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${
+                              selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'
+                            }`}
                           >
-                            <span>{col.name} {col.user_id === user?.id && <span className="text-xs text-gray-400">(My Collection)</span>}</span>
-                            <Badge className="ml-2 bg-green-600 text-white font-semibold">{getCollectionPlantCount(col)}</Badge>
+                            <span>{col.name}</span>
+                            <Badge className="ml-2 bg-green-600 text-white font-semibold">
+                              {col.published_plant_count || 0}
+                            </Badge>
                           </Button>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 text-sm">No collections available</p>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
