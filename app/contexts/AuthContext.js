@@ -83,19 +83,31 @@ export function AuthProvider({ children }) {
   };
 
   const signInWithGoogle = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-        skipBrowserRedirect: false
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          skipBrowserRedirect: false
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Force a session check after redirect
+      if (data?.url) {
+        window.location.href = data.url;
       }
-    });
-    if (error) throw error;
-    return data;
+      
+      return data;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      throw error;
+    }
   };
 
   const value = {

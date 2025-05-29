@@ -30,9 +30,16 @@ export async function GET(request) {
     
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // Use the request's origin to construct the redirect URL
+      // Ensure we're using the correct origin for the redirect
       const redirectUrl = new URL(next, requestUrl.origin)
-      return NextResponse.redirect(redirectUrl.toString())
+      const response = NextResponse.redirect(redirectUrl.toString())
+      
+      // Set cache control headers to prevent caching
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+      response.headers.set('Pragma', 'no-cache')
+      response.headers.set('Expires', '0')
+      
+      return response
     }
   }
 
