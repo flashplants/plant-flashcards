@@ -32,11 +32,11 @@ export async function GET(request) {
     if (!error) {
       // Use the request's origin to construct the redirect URL
       const redirectUrl = new URL(next, requestUrl.origin)
-      return NextResponse.redirect(redirectUrl)
+      return NextResponse.redirect(redirectUrl.toString())
     }
   }
 
   // Return the user to an error page with instructions
   const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin)
-  return NextResponse.redirect(errorUrl)
+  return NextResponse.redirect(errorUrl.toString())
 }

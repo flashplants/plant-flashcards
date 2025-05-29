@@ -720,8 +720,29 @@ export default function PlantFlashcardApp() {
 
   // Helper to get the correct plant count for a collection
   const getCollectionPlantCount = (col) => {
-    if (typeof col.published_plant_count === 'number') return col.published_plant_count;
-    return 0;
+    return col.plant_count || 0;
+  };
+
+  const getStudyTitle = () => {
+    const count = filteredPlants.length;
+    let title = `Studying ${count} plant${count !== 1 ? 's' : ''}`;
+    
+    if (selectedCollection) {
+      const collection = collections.find(c => c.id === selectedCollection);
+      title = `Studying ${count} plant${count !== 1 ? 's' : ''} from ${collection?.name || 'Collection'}`;
+    } else if (favoritesOnly) {
+      title = `Studying ${count} favorite plant${count !== 1 ? 's' : ''}`;
+    } else if (mySightingsOnly) {
+      title = `Studying ${count} plant${count !== 1 ? 's' : ''} you've sighted`;
+    } else if (testableOnly) {
+      title = `Studying ${count} testable plant${count !== 1 ? 's' : ''}`;
+    } else if (needPractice) {
+      title = `Studying ${count} plant${count !== 1 ? 's' : ''} that need practice`;
+    } else if (sightingsFilter !== 'all') {
+      title = `Studying ${count} plant${count !== 1 ? 's' : ''} with ${sightingsFilter}+ sightings`;
+    }
+    
+    return title;
   };
 
   if (loading || isFiltering) {
@@ -776,158 +797,144 @@ export default function PlantFlashcardApp() {
   const progress = ((answered.size / displayPlants.length) * 100).toFixed(0);
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-16 ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
-      {!isFullscreen && <Header />}
-      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isFullscreen ? 'h-screen flex items-center justify-center' : ''}`}>
-        <AuthModal 
-          isOpen={showAuth} 
-          onClose={() => setShowAuth(false)}
-        />
-
-        <div className={`max-w-4xl mx-auto ${isFullscreen ? 'w-full max-w-6xl' : ''}`}>
-          {/* Filters */}
-          {!isFullscreen && (
-            <div className="mb-6 bg-white rounded-lg shadow-md overflow-hidden">
+    <div className={`min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
+      <Header />
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-xl font-bold text-gray-800">{getStudyTitle()}</h1>
               <button
                 onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
-                className="w-full px-4 py-2 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+                className="text-gray-600 hover:text-gray-800"
               >
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-gray-600" />
-                  <span className="font-medium text-gray-700">Filters</span>
-                </div>
-                <ChevronDown 
-                  className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
-                    isFiltersExpanded ? 'rotate-0' : '-rotate-90'
-                  }`}
-                />
+                {isFiltersExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronDown className="w-5 h-5 transform rotate-180" />}
               </button>
-              
-              <div className={`transition-all duration-300 ease-in-out ${
-                isFiltersExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-              }`}>
-                <div className="p-4">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <Button
-                      onClick={() => {
-                        setSelectedCollection(null);
-                        setNeedPractice(false);
-                        setFavoritesOnly(false);
-                        setMySightingsOnly(false);
-                        setTestableOnly(false);
-                      }}
-                      variant={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'default' : 'outline'}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                      aria-pressed={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly}
-                    >
-                      <Leaf className="w-4 h-4" />
-                      All Plants
-                      <Badge className="ml-2 bg-green-600 text-white font-semibold">{plants.length}</Badge>
-                    </Button>
-                    {user && (
-                      <>
-                        <Button
-                          onClick={() => setFavoritesOnly((prev) => !prev)}
-                          variant={favoritesOnly ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${favoritesOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={favoritesOnly}
-                        >
-                          <Star className="w-4 h-4" />
-                          Favorites
-                          <Badge className="ml-2 bg-green-600 text-white font-semibold">{getFavoritesCount()}</Badge>
-                        </Button>
-                        <Button
-                          onClick={() => setMySightingsOnly((prev) => !prev)}
-                          variant={mySightingsOnly ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={mySightingsOnly}
-                        >
-                          <Eye className="w-4 h-4" />
-                          My Sightings
-                        </Button>
-                        <Button
-                          onClick={() => setTestableOnly((prev) => !prev)}
-                          variant={testableOnly ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={testableOnly}
-                        >
-                          <Check className="w-4 h-4" />
-                          Test Me
-                        </Button>
-                        <Button
-                          onClick={() => setNeedPractice((prev) => !prev)}
-                          variant={needPractice ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${needPractice ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={needPractice}
-                        >
-                          <CircleDashed className="w-4 h-4" />
-                          Need Practice
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Sightings Filter */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <Globe className="w-4 h-4 text-gray-600" />
-                    <div className="flex gap-2">
+            </div>
+            <div className={`transition-all duration-300 ease-in-out ${
+              isFiltersExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+            }`}>
+              <div className="p-4">
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <Button
+                    onClick={() => {
+                      setSelectedCollection(null);
+                      setNeedPractice(false);
+                      setFavoritesOnly(false);
+                      setMySightingsOnly(false);
+                      setTestableOnly(false);
+                    }}
+                    variant={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'default' : 'outline'}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                    aria-pressed={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly}
+                  >
+                    <Leaf className="w-4 h-4" />
+                    All Plants
+                    <Badge className="ml-2 bg-green-600 text-white font-semibold">{plants.length}</Badge>
+                  </Button>
+                  {user && (
+                    <>
                       <Button
-                        variant={sightingsFilter === 'all' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === 'all'}
-                        onClick={() => setSightingsFilter('all')}
+                        onClick={() => setFavoritesOnly((prev) => !prev)}
+                        variant={favoritesOnly ? 'default' : 'outline'}
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${favoritesOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={favoritesOnly}
                       >
-                        All
+                        <Star className="w-4 h-4" />
+                        Favorites
+                        <Badge className="ml-2 bg-green-600 text-white font-semibold">{getFavoritesCount()}</Badge>
                       </Button>
                       <Button
-                        variant={sightingsFilter === '1' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === '1'}
-                        onClick={() => setSightingsFilter('1')}
+                        onClick={() => setMySightingsOnly((prev) => !prev)}
+                        variant={mySightingsOnly ? 'default' : 'outline'}
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={mySightingsOnly}
                       >
-                        1+
+                        <Eye className="w-4 h-4" />
+                        My Sightings
                       </Button>
                       <Button
-                        variant={sightingsFilter === '2' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === '2'}
-                        onClick={() => setSightingsFilter('2')}
+                        onClick={() => setTestableOnly((prev) => !prev)}
+                        variant={testableOnly ? 'default' : 'outline'}
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={testableOnly}
                       >
-                        2+
+                        <Check className="w-4 h-4" />
+                        Test Me
                       </Button>
                       <Button
-                        variant={sightingsFilter === '3' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === '3'}
-                        onClick={() => setSightingsFilter('3')}
+                        onClick={() => setNeedPractice((prev) => !prev)}
+                        variant={needPractice ? 'default' : 'outline'}
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${needPractice ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={needPractice}
                       >
-                        3+
+                        <CircleDashed className="w-4 h-4" />
+                        Need Practice
                       </Button>
-                    </div>
-                  </div>
-                  
-                  {collections.length > 0 && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <Filter className="w-4 h-4 text-gray-600" />
-                      <div className="flex flex-wrap gap-2">
-                        {collections.map(col => (
-                          <Button
-                            key={col.id}
-                            variant={selectedCollection === col.id ? 'default' : 'outline'}
-                            onClick={() => setSelectedCollection(selectedCollection === col.id ? null : col.id)}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          >
-                            <span>{col.name} {col.user_id === user?.id && <span className="text-xs text-gray-400">(My Collection)</span>}</span>
-                            <Badge className="ml-2 bg-green-600 text-white font-semibold">{getCollectionPlantCount(col)}</Badge>
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
+                    </>
                   )}
                 </div>
+                
+                {/* Sightings Filter */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Globe className="w-4 h-4 text-gray-600" />
+                  <div className="flex gap-2">
+                    <Button
+                      variant={sightingsFilter === 'all' ? 'default' : 'outline'}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                      aria-pressed={sightingsFilter === 'all'}
+                      onClick={() => setSightingsFilter('all')}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={sightingsFilter === '1' ? 'default' : 'outline'}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                      aria-pressed={sightingsFilter === '1'}
+                      onClick={() => setSightingsFilter('1')}
+                    >
+                      1+
+                    </Button>
+                    <Button
+                      variant={sightingsFilter === '2' ? 'default' : 'outline'}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                      aria-pressed={sightingsFilter === '2'}
+                      onClick={() => setSightingsFilter('2')}
+                    >
+                      2+
+                    </Button>
+                    <Button
+                      variant={sightingsFilter === '3' ? 'default' : 'outline'}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                      aria-pressed={sightingsFilter === '3'}
+                      onClick={() => setSightingsFilter('3')}
+                    >
+                      3+
+                    </Button>
+                  </div>
+                </div>
+                
+                {collections.length > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Filter className="w-4 h-4 text-gray-600" />
+                    <div className="flex flex-wrap gap-2">
+                      {collections.map(col => (
+                        <Button
+                          key={col.id}
+                          variant={selectedCollection === col.id ? 'default' : 'outline'}
+                          onClick={() => setSelectedCollection(selectedCollection === col.id ? null : col.id)}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        >
+                          <span>{col.name} {col.user_id === user?.id && <span className="text-xs text-gray-400">(My Collection)</span>}</span>
+                          <Badge className="ml-2 bg-green-600 text-white font-semibold">{getCollectionPlantCount(col)}</Badge>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
 
           {/* Flashcard */}
           <div className={`bg-white rounded-xl shadow-lg p-8 mb-6 ${isFullscreen ? 'h-[90vh] flex flex-col' : 'min-h-[600px] flex flex-col'}`}>
