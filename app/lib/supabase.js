@@ -1,15 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // Determine the site URL based on environment
 const getSiteUrl = () => {
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:3000';
+  if (typeof window !== 'undefined') {
+    return window.location.origin
   }
-  return 'https://plant-flashcards.vercel.app';
-};
+  return process.env.NEXT_PUBLIC_SITE_URL || 'https://plant-flashcards.vercel.app'
+}
 
 // Create a single instance of the Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -18,6 +18,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     persistSession: true,
-    redirectTo: 'https://dkupdfjpymlsspxehajc.supabase.co/auth/v1/callback'
+    redirectTo: `${getSiteUrl()}/auth/callback`
   }
 }) 
