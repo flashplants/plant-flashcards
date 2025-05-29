@@ -1,23 +1,13 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-// Determine the site URL based on environment
-const getSiteUrl = () => {
-  if (typeof window !== 'undefined') {
-    return window.location.origin
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
   }
-  return process.env.NEXT_PUBLIC_SITE_URL || 'https://plant-flashcards.vercel.app'
-}
-
-// Create a single instance of the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    flowType: 'pkce',
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    persistSession: true,
-    redirectTo: `${getSiteUrl()}/auth/callback`
-  }
-}) 
+) 

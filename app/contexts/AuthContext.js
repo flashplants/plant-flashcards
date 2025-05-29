@@ -80,31 +80,15 @@ export function AuthProvider({ children }) {
   };
 
   const signInWithGoogle = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent'
-          }
-        }
-      })
-
-      if (error) {
-        console.error('Error signing in with Google:', error)
-        throw error
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
       }
-
-      if (data?.url) {
-        window.location.href = data.url
-      }
-    } catch (error) {
-      console.error('Error in signInWithGoogle:', error)
-      throw error
-    }
-  }
+    });
+    if (error) throw error;
+    return data;
+  };
 
   const value = {
     user,
