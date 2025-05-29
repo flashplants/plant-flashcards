@@ -1185,27 +1185,27 @@ export default function PlantFlashcardApp() {
 
       {/* Session Summary Modal */}
       {showSessionSummary && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Study Session Summary</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Study Session Summary</h2>
             
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex justify-between items-center text-sm sm:text-base">
                 <span className="text-gray-600">Total Cards:</span>
                 <span className="font-semibold">{displayPlants.length}</span>
               </div>
               
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center text-sm sm:text-base">
                 <span className="text-gray-600">Correct Answers:</span>
                 <span className="font-semibold text-green-600">{stats.correct}</span>
               </div>
               
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center text-sm sm:text-base">
                 <span className="text-gray-600">Incorrect Answers:</span>
                 <span className="font-semibold text-red-600">{stats.incorrect}</span>
               </div>
               
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center text-sm sm:text-base">
                 <span className="text-gray-600">Accuracy:</span>
                 <span className="font-semibold">
                   {Math.round((stats.correct / displayPlants.length) * 100)}%
@@ -1214,11 +1214,11 @@ export default function PlantFlashcardApp() {
             </div>
 
             {incorrectPlants.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Plants to Review:</h3>
-                <ul className="space-y-2">
+              <div className="mt-4 sm:mt-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Plants to Review:</h3>
+                <ul className="space-y-1 sm:space-y-2 max-h-[30vh] overflow-y-auto">
                   {incorrectPlants.map(plant => (
-                    <li key={plant.id} className="text-gray-600">
+                    <li key={plant.id} className="text-sm sm:text-base text-gray-600">
                       {renderPlantName(plant)}
                     </li>
                   ))}
@@ -1226,17 +1226,17 @@ export default function PlantFlashcardApp() {
               </div>
             )}
 
-            <div className="mt-8 flex justify-end gap-4">
+            <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
               <button
                 onClick={() => startNewSession(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm sm:text-base"
               >
                 New Session
               </button>
               {incorrectPlants.length > 0 && (
                 <button
                   onClick={() => startNewSession(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm sm:text-base"
                 >
                   Study Incorrect Answers
                 </button>
