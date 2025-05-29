@@ -83,17 +83,15 @@ export function AuthProvider({ children }) {
   };
 
   const signInWithGoogle = async () => {
-    const redirectUrl = new URL('/auth/callback', window.location.origin)
-    redirectUrl.searchParams.set('next', window.location.pathname)
-    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectUrl.toString(),
+        redirectTo: `${window.location.origin}/auth/callback`,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
-        }
+        },
+        skipBrowserRedirect: false
       }
     });
     if (error) throw error;

@@ -9,7 +9,7 @@ export const supabase = createBrowserClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: 'pkce',
-      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined
     }
   }
 ) 
