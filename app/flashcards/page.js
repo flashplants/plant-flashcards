@@ -1102,50 +1102,50 @@ export default function PlantFlashcardApp() {
               </div>
             </div>
 
+            {/* Navigation */}
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <button
+                onClick={prevCard}
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md text-sm sm:text-base"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Previous</span>
+              </button>
+              
+              <button
+                onClick={flipCard}
+                className="px-3 sm:px-6 py-1.5 sm:py-2 bg-green-600 text-white rounded-lg shadow hover:shadow-md text-sm sm:text-base"
+              >
+                {showAnswer ? 'Show Question' : 'Show Answer'}
+              </button>
+
+              <button
+                onClick={nextCard}
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md text-sm sm:text-base"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            </div>
+
             {showAnswer && !answered.has(currentIndex) && (
-              <div className="flex justify-center gap-4 mt-6">
+              <div className="flex justify-center gap-2 sm:gap-4 mt-4 sm:mt-6">
                 <button
                   onClick={() => markAnswer(true)}
-                  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-1.5 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm sm:text-base"
                 >
-                  <Check className="w-5 h-5" />
-                  I knew it!
+                  <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span>I knew it!</span>
                 </button>
                 <button
                   onClick={() => markAnswer(false)}
-                  className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-1.5 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm sm:text-base"
                 >
-                  <X className="w-5 h-5" />
-                  I didn't know
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span>I didn't know</span>
                 </button>
               </div>
             )}
-          </div>
-
-          {/* Navigation */}
-          <div className="flex justify-between items-center mb-6">
-            <button
-              onClick={prevCard}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md"
-            >
-              <ChevronLeft className="w-5 h-5" />
-              Previous
-            </button>
-            
-            <button
-              onClick={flipCard}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:shadow-md"
-            >
-              {showAnswer ? 'Show Question' : 'Show Answer'}
-            </button>
-
-            <button
-              onClick={nextCard}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow hover:shadow-md"
-            >
-              Next
-              <ChevronRight className="w-5 h-5" />
-            </button>
           </div>
 
           {/* Stats */}
