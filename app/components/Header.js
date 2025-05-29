@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, House, CircleGauge, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, CircleGauge, Menu, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -77,56 +77,9 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-4">
-            <Link
-              href="/"
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                pathname === '/'
-                  ? 'text-green-600 bg-green-50'
-                  : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-              }`}
-            >
-              <House className="w-5 h-5" />
-              <span>Home</span>
-            </Link>
-            <Link
-              href="/plants"
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                pathname === '/plants'
-                  ? 'text-green-600 bg-green-50'
-                  : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-              }`}
-            >
-              <Leaf className="w-5 h-5" />
-              <span>Plants</span>
-            </Link>
-            <Link
-              href="/flashcards"
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                pathname === '/flashcards'
-                  ? 'text-green-600 bg-green-50'
-                  : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-              }`}
-            >
-              <GalleryHorizontalEnd className="w-5 h-5" />
-              <span>Flashcards</span>
-            </Link>
-            {isAdmin && (
-              <Link
-                href="/dashboard"
-                onClick={handleDashboardClick}
-                className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                  pathname === '/dashboard'
-                    ? 'text-green-600 bg-green-50'
-                    : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-                }`}
-              >
-                <CircleGauge className="w-5 h-5" />
-                <span>Admin Dashboard</span>
-              </Link>
-            )}
           </nav>
 
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
             {/* Mobile menu button */}
             <button
               onClick={toggleMobileMenu}
@@ -141,28 +94,37 @@ export default function Header() {
             </button>
 
             {/* Desktop auth button */}
-            <div className="hidden md:block">
+            <div className="hidden md:flex items-center space-x-4">
+              {isAdmin && (
+                <Link
+                  href="/dashboard"
+                  onClick={handleDashboardClick}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+                    pathname === '/dashboard'
+                      ? 'text-green-600 bg-green-50'
+                      : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+                  }`}
+                >
+                  <CircleGauge className="w-5 h-5" />
+                  <span>Dashboard</span>
+                </Link>
+              )}
               {user ? (
                 <button
                   onClick={handleSignOut}
                   disabled={isSigningOut}
-                  className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50 disabled:opacity-50"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {isSigningOut ? 'Signing out...' : 'Sign Out'}
+                  <LogOut className="w-5 h-5" />
+                  <span>{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
                 </button>
               ) : (
                 <button
                   onClick={() => setShowAuth(true)}
-                  className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M15 7a2 2 0 012 2m4 0a2 2 0 012-2m-4-4a2 2 0 00-2 2m4 0a2 2 0 002-2m-4-4a2 2 0 00-2 2m4 0a2 2 0 002-2" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M3 12a9 9 0 1118 0 9 9 0 01-18 0z" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Sign In
+                  <LogIn className="w-5 h-5" />
+                  <span>Sign In</span>
                 </button>
               )}
             </div>
@@ -196,42 +158,6 @@ export default function Header() {
             </div>
 
             <nav className="flex-1 px-4 py-6 space-y-4">
-              <Link
-                href="/"
-                onClick={closeMobileMenu}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                  pathname === '/'
-                    ? 'text-green-600 bg-green-50'
-                    : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-                }`}
-              >
-                <House className="w-5 h-5" />
-                <span>Home</span>
-              </Link>
-              <Link
-                href="/plants"
-                onClick={closeMobileMenu}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                  pathname === '/plants'
-                    ? 'text-green-600 bg-green-50'
-                    : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-                }`}
-              >
-                <Leaf className="w-5 h-5" />
-                <span>Plants</span>
-              </Link>
-              <Link
-                href="/flashcards"
-                onClick={closeMobileMenu}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                  pathname === '/flashcards'
-                    ? 'text-green-600 bg-green-50'
-                    : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-                }`}
-              >
-                <GalleryHorizontalEnd className="w-5 h-5" />
-                <span>Flashcards</span>
-              </Link>
               {isAdmin && (
                 <Link
                   href="/dashboard"
@@ -246,7 +172,7 @@ export default function Header() {
                   }`}
                 >
                   <CircleGauge className="w-5 h-5" />
-                  <span>Admin Dashboard</span>
+                  <span>Dashboard</span>
                 </Link>
               )}
             </nav>
@@ -259,12 +185,10 @@ export default function Header() {
                     handleSignOut();
                   }}
                   disabled={isSigningOut}
-                  className="w-full inline-flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50 disabled:opacity-50"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {isSigningOut ? 'Signing out...' : 'Sign Out'}
+                  <LogOut className="w-5 h-5" />
+                  <span>{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
                 </button>
               ) : (
                 <button
@@ -272,13 +196,10 @@ export default function Header() {
                     closeMobileMenu();
                     setShowAuth(true);
                   }}
-                  className="w-full inline-flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M15 7a2 2 0 012 2m4 0a2 2 0 012-2m-4-4a2 2 0 00-2 2m4 0a2 2 0 002-2m-4-4a2 2 0 00-2 2m4 0a2 2 0 002-2" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M3 12a9 9 0 1118 0 9 9 0 01-18 0z" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Sign In
+                  <LogIn className="w-5 h-5" />
+                  <span>Sign In</span>
                 </button>
               )}
             </div>
