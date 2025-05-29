@@ -62,11 +62,14 @@ export function AuthProvider({ children }) {
   };
 
   const signUp = async (email, password) => {
+    const redirectUrl = new URL('/auth/callback', window.location.origin)
+    redirectUrl.searchParams.set('next', window.location.pathname)
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`
+        emailRedirectTo: redirectUrl.toString()
       }
     });
     if (error) throw error;
@@ -80,10 +83,13 @@ export function AuthProvider({ children }) {
   };
 
   const signInWithGoogle = async () => {
+    const redirectUrl = new URL('/auth/callback', window.location.origin)
+    redirectUrl.searchParams.set('next', window.location.pathname)
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`
+        redirectTo: redirectUrl.toString()
       }
     });
     if (error) throw error;
