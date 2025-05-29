@@ -92,13 +92,13 @@ export function AuthProvider({ children }) {
             access_type: 'offline',
             prompt: 'consent',
           },
-          skipBrowserRedirect: false
+          skipBrowserRedirect: true
         }
       });
       
       if (error) throw error;
       
-      // Force a session check after redirect
+      // Handle the redirect manually
       if (data?.url) {
         window.location.href = data.url;
       }

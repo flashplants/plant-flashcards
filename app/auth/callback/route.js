@@ -43,7 +43,8 @@ export async function GET(request) {
     }
   }
 
-  // Return the user to an error page with instructions
+  // If we get here, something went wrong
+  console.error('Error in callback route:', requestUrl.toString())
   const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin)
   return NextResponse.redirect(errorUrl.toString())
 }
