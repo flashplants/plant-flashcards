@@ -202,7 +202,7 @@ export default function PlantDetailPage({ params }) {
             <div className="aspect-square relative bg-white rounded-lg overflow-hidden">
               {plant.plant_images?.[currentImageIndex] ? (
                 <img
-                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.plant_images[currentImageIndex].path.startsWith(authUser?.id) ? 'user-plant-images' : 'plant-images'}/${plant.plant_images[currentImageIndex].path}`}
+                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.is_admin_plant ? 'plant-images' : 'user-plant-images'}/${plant.plant_images[currentImageIndex].path}`}
                   alt={renderPlantName(plant)}
                   className="w-full h-full object-cover"
                 />
@@ -253,7 +253,7 @@ export default function PlantDetailPage({ params }) {
                     onClick={() => setCurrentImageIndex(index)}
                   >
                     <img
-                      src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${image.path.startsWith(authUser?.id) ? 'user-plant-images' : 'plant-images'}/${image.path}`}
+                      src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.is_admin_plant ? 'plant-images' : 'user-plant-images'}/${image.path}`}
                       alt={`${renderPlantName(plant)} - Image ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
