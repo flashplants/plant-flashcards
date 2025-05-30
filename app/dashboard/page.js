@@ -202,6 +202,9 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
     description: '',
     is_published: false
   });
+  const [showAdminPlants, setShowAdminPlants] = useState(true);
+  const [showAdminCollections, setShowAdminCollections] = useState(true);
+  const [showAdminSightings, setShowAdminSightings] = useState(true);
 
   // Pagination state from URL
   const searchParams = useSearchParams();
@@ -230,6 +233,23 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
       fetchUserData();
     }
   }, [authUser]);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('show_admin_plants, show_admin_collections, show_admin_sightings')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            if (typeof data.show_admin_plants === 'boolean') setShowAdminPlants(data.show_admin_plants);
+            if (typeof data.show_admin_collections === 'boolean') setShowAdminCollections(data.show_admin_collections);
+            if (typeof data.show_admin_sightings === 'boolean') setShowAdminSightings(data.show_admin_sightings);
+          }
+        });
+    }
+  }, [user]);
 
   const fetchUserData = async () => {
     // Fetch user's favorites
@@ -781,9 +801,10 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
     }
   };
 
+  // Filtered plants based on admin plant preference
   const filteredPlants = showFavoritesOnly 
     ? plants.filter(plant => favorites.has(plant.id))
-    : plants;
+    : plants.filter(plant => showAdminPlants || !plant.is_admin_plant || plant.user_id === authUser?.id);
 
   const PaginationControls = () => {
     const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -1051,6 +1072,9 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
     }
   };
 
+  // Filtered collections based on admin collection preference
+  const filteredCollections = collections.filter(c => showAdminCollections || !c.is_admin_collection);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -1170,7 +1194,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
 
                 {/* Collections List */}
                 <div className="space-y-4">
-                  {collections.map(collection => (
+                  {filteredCollections.map(collection => (
                     <div key={collection.id} className="border rounded-lg p-4">
                       {editingCollection?.id === collection.id ? (
                         <div className="space-y-4">
@@ -1360,8 +1384,8 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                         onChange={e => setSelectedFilters(prev => ({ ...prev, collection_id: e.target.value || null }))}
                       >
                         <option value="">All Collections</option>
-                        {collections.map(col => (
-                          <option key={col.id} value={col.id}>{getCollectionLabel(col, collections)}</option>
+                        {filteredCollections.map(col => (
+                          <option key={col.id} value={col.id}>{getCollectionLabel(col, filteredCollections)}</option>
                         ))}
                       </select>
                     </div>
@@ -1401,7 +1425,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
               {selectedFilters.collection_id && (
                 <Badge variant="secondary">
                   {(() => {
-                    const col = collections.find(c => String(c.id) === String(selectedFilters.collection_id));
+                    const col = filteredCollections.find(c => String(c.id) === String(selectedFilters.collection_id));
                     if (!col) {
                       return <span className="flex items-center"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></span>Loading...</span>;
                     }
@@ -1596,7 +1620,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                           className="w-full rounded-md border border-input bg-background px-3 py-2"
                         >
                           <option value="">No Collection</option>
-                          {collections.map(col => (
+                          {filteredCollections.map(col => (
                             <option key={col.id} value={col.id}>{col.name}</option>
                           ))}
                         </select>
@@ -1836,7 +1860,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                                   className="w-full rounded-md border border-input bg-background px-3 py-2"
                                 >
                                   <option value="">No Collection</option>
-                                  {collections.map(col => (
+                                  {filteredCollections.map(col => (
                                     <option key={col.id} value={col.id}>{col.name}</option>
                                   ))}
                                 </select>
@@ -1963,29 +1987,37 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                           )}
                           {/* Sightings Row */}
                           <div className="flex items-center gap-2 mt-2">
-                            <span className="text-sm text-gray-600 font-medium">
-                              {isAdmin ? 'Global Sightings:' : 'My Sightings:'}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => isAdmin ? updateGlobalSighting(plant.id, -1) : updateUserSighting(plant.id, -1)}
-                              disabled={(isAdmin ? globalSightings[plant.id] : userSightings[plant.id]) <= 0}
-                              aria-label={`Decrease ${isAdmin ? 'global' : 'my'} sightings`}
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span className="text-base font-semibold min-w-[2ch] text-center">
-                              {isAdmin ? (globalSightings[plant.id] ?? 0) : (userSightings[plant.id] ?? 0)}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => isAdmin ? updateGlobalSighting(plant.id, 1) : updateUserSighting(plant.id, 1)}
-                              aria-label={`Increase ${isAdmin ? 'global' : 'my'} sightings`}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
+                            {showAdminSightings && (
+                              <span className="text-sm text-gray-600 font-medium">
+                                {isAdmin ? 'Global Sightings:' : 'My Sightings:'}
+                              </span>
+                            )}
+                            {showAdminSightings && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => isAdmin ? updateGlobalSighting(plant.id, -1) : updateUserSighting(plant.id, -1)}
+                                disabled={(isAdmin ? globalSightings[plant.id] : userSightings[plant.id]) <= 0}
+                                aria-label={`Decrease ${isAdmin ? 'global' : 'my'} sightings`}
+                              >
+                                <Minus className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {showAdminSightings && (
+                              <span className="text-base font-semibold min-w-[2ch] text-center">
+                                {isAdmin ? (globalSightings[plant.id] ?? 0) : (userSightings[plant.id] ?? 0)}
+                              </span>
+                            )}
+                            {showAdminSightings && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => isAdmin ? updateGlobalSighting(plant.id, 1) : updateUserSighting(plant.id, 1)}
+                                aria-label={`Increase ${isAdmin ? 'global' : 'my'} sightings`}
+                              >
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}

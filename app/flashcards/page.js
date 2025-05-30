@@ -76,6 +76,9 @@ export default function PlantFlashcardApp() {
   const [mySightingsOnly, setMySightingsOnly] = useState(false);
   const [testableOnly, setTestableOnly] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showAdminPlants, setShowAdminPlants] = useState(true);
+  const [showAdminCollections, setShowAdminCollections] = useState(true);
+  const [showAdminSightings, setShowAdminSightings] = useState(true);
 
   // Add component mount logging
   useEffect(() => {
@@ -281,6 +284,11 @@ export default function PlantFlashcardApp() {
           filtered = filtered.filter(p => practiceIds.includes(p.id));
         }
 
+        // After fetching plants, filter them in JS if needed
+        if (user && !showAdminPlants) {
+          filtered = filtered.filter(plant => !plant.is_admin_plant || plant.user_id === user.id);
+        }
+
         setFilteredPlants(filtered);
       } catch (error) {
         console.error('Error applying filters:', error);
@@ -291,12 +299,29 @@ export default function PlantFlashcardApp() {
     };
 
     applyFilters();
-  }, [selectedCollection, plants, isAuthenticated, sightingsFilter, needPractice, favoritesOnly, mySightingsOnly, testableOnly, favorites, user]);
+  }, [selectedCollection, plants, isAuthenticated, sightingsFilter, needPractice, favoritesOnly, mySightingsOnly, testableOnly, favorites, user, showAdminPlants]);
 
   // Fetch user data when user changes
   useEffect(() => {
     if (user) {
       fetchUserData();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('show_admin_plants, show_admin_collections, show_admin_sightings')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            if (typeof data.show_admin_plants === 'boolean') setShowAdminPlants(data.show_admin_plants);
+            if (typeof data.show_admin_collections === 'boolean') setShowAdminCollections(data.show_admin_collections);
+            if (typeof data.show_admin_sightings === 'boolean') setShowAdminSightings(data.show_admin_sightings);
+          }
+        });
     }
   }, [user]);
 
@@ -909,70 +934,75 @@ export default function PlantFlashcardApp() {
                   </div>
                   
                   {/* Sightings Filter */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <Globe className="w-4 h-4 text-gray-600" />
-                    <div className="flex gap-2">
-                      <Button
-                        variant={sightingsFilter === 'all' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === 'all'}
-                        onClick={() => setSightingsFilter('all')}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        variant={sightingsFilter === '1' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === '1'}
-                        onClick={() => setSightingsFilter('1')}
-                      >
-                        1+
-                      </Button>
-                      <Button
-                        variant={sightingsFilter === '2' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === '2'}
-                        onClick={() => setSightingsFilter('2')}
-                      >
-                        2+
-                      </Button>
-                      <Button
-                        variant={sightingsFilter === '3' ? 'default' : 'outline'}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                        aria-pressed={sightingsFilter === '3'}
-                        onClick={() => setSightingsFilter('3')}
-                      >
-                        3+
-                      </Button>
+                  {showAdminSightings && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <Globe className="w-4 h-4 text-gray-600" />
+                      <div className="flex gap-2">
+                        <Button
+                          variant={sightingsFilter === 'all' ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                          aria-pressed={sightingsFilter === 'all'}
+                          onClick={() => setSightingsFilter('all')}
+                        >
+                          All
+                        </Button>
+                        <Button
+                          variant={sightingsFilter === '1' ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                          aria-pressed={sightingsFilter === '1'}
+                          onClick={() => setSightingsFilter('1')}
+                        >
+                          1+
+                        </Button>
+                        <Button
+                          variant={sightingsFilter === '2' ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                          aria-pressed={sightingsFilter === '2'}
+                          onClick={() => setSightingsFilter('2')}
+                        >
+                          2+
+                        </Button>
+                        <Button
+                          variant={sightingsFilter === '3' ? 'default' : 'outline'}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                          aria-pressed={sightingsFilter === '3'}
+                          onClick={() => setSightingsFilter('3')}
+                        >
+                          3+
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
                   {/* Collections Filter */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <Filter className="w-4 h-4 text-gray-600" />
-                    <div className="flex flex-wrap gap-2">
-                      {console.log('Rendering collections:', collections)}
-                      {collections && collections.length > 0 ? (
-                        collections.map(col => (
-                          <Button
-                            key={col.id}
-                            variant={selectedCollection === col.id ? 'default' : 'outline'}
-                            onClick={() => setSelectedCollection(selectedCollection === col.id ? null : col.id)}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${
-                              selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'
-                            }`}
-                          >
-                            <span>{col.name}</span>
-                            <Badge className="ml-2 bg-green-600 text-white font-semibold">
-                              {col.published_plant_count || 0}
-                            </Badge>
-                          </Button>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-sm">No collections available</p>
-                      )}
+                  {showAdminCollections && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <Filter className="w-4 h-4 text-gray-600" />
+                      <div className="flex flex-wrap gap-2">
+                        {collections && collections.length > 0 ? (
+                          collections
+                            .filter(col => showAdminCollections || !col.is_admin_collection)
+                            .map(col => (
+                              <Button
+                                key={col.id}
+                                variant={selectedCollection === col.id ? 'default' : 'outline'}
+                                onClick={() => setSelectedCollection(selectedCollection === col.id ? null : col.id)}
+                                className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${
+                                  selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'
+                                }`}
+                              >
+                                <span>{col.name}</span>
+                                <Badge className="ml-2 bg-green-600 text-white font-semibold">
+                                  {col.published_plant_count || 0}
+                                </Badge>
+                              </Button>
+                            ))
+                        ) : (
+                          <p className="text-gray-500 text-sm">No collections available</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1095,6 +1125,11 @@ export default function PlantFlashcardApp() {
                         <p className={`text-gray-600 mt-4 max-w-md mx-auto ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
                           {currentPlant.description}
                         </p>
+                      )}
+                      {showAdminSightings && (
+                        <Badge className="ml-2 bg-green-600 text-white font-semibold">
+                          Global sightings: {currentPlant.global_sighting_counts?.sighting_count || 0}
+                        </Badge>
                       )}
                     </div>
                   </div>
