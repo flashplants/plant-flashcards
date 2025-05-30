@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, CircleGauge, Menu, X, User } from 'lucide-react';
+import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, CircleGauge, Menu, X, User, ClipboardList } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -70,74 +70,50 @@ export default function Header() {
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <Link href="/" className="flex items-center">
-              <Leaf className="w-5 h-5 text-green-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Plant Flashcards</span>
-            </Link>
-          </div>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center gap-2">
-              {/* Dashboard button */}
-              {user && (
-                <Button
-                  variant="ghost"
-                  onClick={handleDashboardClick}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-base font-medium",
-                    pathname.startsWith("/dashboard") ? "text-green-600" : "text-gray-700 hover:text-green-600"
-                  )}
-                  title="Dashboard"
-                >
-                  <CircleGauge className="w-5 h-5" />
-                </Button>
-              )}
-              {/* Sign In/Out button */}
-              {user ? (
-                <Button
-                  variant="ghost"
-                  onClick={handleSignOut}
-                  className="flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-5 h-5" />
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowAuth(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600"
-                >
-                  <LogIn className="w-5 h-5" />
-                  Sign In
-                </Button>
-              )}
-              {/* Username badge */}
-              {user && displayName && (
-                <Badge className="ml-2 bg-green-100 text-green-800 font-semibold px-3 py-1 text-base rounded-full">
-                  {displayName}
-                </Badge>
-              )}
-            </div>
+        <div className="flex w-full items-center h-16">
+          <Link href="/" className="flex items-center">
+            <Leaf className="w-5 h-5 text-green-600" />
+            <span className="ml-2 text-xl font-bold text-gray-900">Plant Flashcards</span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6 ml-auto">
+            {user && displayName && (
+              <Badge className="bg-green-100 text-green-800 font-semibold px-3 py-1 text-base rounded-full min-w-0 max-w-[8rem] sm:max-w-xs truncate">
+                <span className="block truncate text-sm sm:text-base">{displayName}</span>
+              </Badge>
+            )}
+            {user && (
+              <Button
+                variant="ghost"
+                onClick={handleDashboardClick}
+                className={cn(
+                  "flex items-center justify-center p-2 text-base font-medium",
+                  pathname.startsWith("/dashboard") ? "text-green-600" : "text-gray-700 hover:text-green-600"
+                )}
+                title="Dashboard"
+              >
+                <ClipboardList className="w-6 h-6" />
+              </Button>
+            )}
+            {user ? (
+              <Button
+                variant="ghost"
+                onClick={handleSignOut}
+                className="flex items-center justify-center p-2 text-base font-medium text-gray-700 hover:text-green-600"
+                title="Sign Out"
+              >
+                <LogOut className="w-6 h-6" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                onClick={() => setShowAuth(true)}
+                className="flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600"
+              >
+                <LogIn className="w-5 h-5" />
+                Sign In
+              </Button>
+            )}
           </nav>
-
-          <div className="flex items-center space-x-4">
-            {/* Mobile menu button */}
-            <button
-              onClick={toggleMobileMenu}
-              className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
-            >
-              <span className="sr-only">Open main menu</span>
-              {isMobileMenuOpen ? (
-                <X className="block h-6 w-6" />
-              ) : (
-                <Menu className="block h-6 w-6" />
-              )}
-            </button>
-          </div>
         </div>
       </div>
 
@@ -168,8 +144,8 @@ export default function Header() {
 
             <nav className="flex-1 px-4 py-6 space-y-4">
               <div className="px-3 py-2">
-                <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
-                  {displayName}
+                <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 min-w-0 max-w-[12rem] text-base rounded-full px-3 py-1 block truncate">
+                  <span className="block truncate text-base">{displayName}</span>
                 </Badge>
               </div>
               <button
@@ -183,7 +159,7 @@ export default function Header() {
                     : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
                 }`}
               >
-                <CircleGauge className="w-5 h-5" />
+                <ClipboardList className="w-5 h-5" />
                 <span>Dashboard</span>
               </button>
             </nav>
