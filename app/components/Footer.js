@@ -35,17 +35,6 @@ export default function Footer() {
             <GalleryHorizontalEnd className="w-5 h-5" />
             <span className="text-xs font-medium">Flashcards</span>
           </Link>
-          {user && (
-            <Link
-              href="/settings"
-              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                pathname === '/settings' ? 'text-green-600 bg-green-50' : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-              }`}
-            >
-              <Settings className="w-5 h-5" />
-              <span className="text-xs font-medium">Settings</span>
-            </Link>
-          )}
         </div>
       </nav>
     </footer>

@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, CircleGauge, Menu, X, User, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, CircleGauge, Menu, X, User, ClipboardList, Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -94,6 +94,19 @@ export default function Header() {
                 <ClipboardList className="w-6 h-6" />
               </Button>
             )}
+            {user && (
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/settings')}
+                className={cn(
+                  "flex items-center justify-center p-2 text-base font-medium",
+                  pathname.startsWith("/settings") ? "text-green-600" : "text-gray-700 hover:text-green-600"
+                )}
+                title="Settings"
+              >
+                <Settings className="w-6 h-6" />
+              </Button>
+            )}
             {user ? (
               <Button
                 variant="ghost"
@@ -114,6 +127,14 @@ export default function Header() {
               </Button>
             )}
           </nav>
+          {/* Hamburger menu button for mobile */}
+          <button
+            className="ml-auto md:hidden p-2 rounded-md text-gray-700 hover:text-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+            onClick={toggleMobileMenu}
+            aria-label="Open menu"
+          >
+            <Menu className="w-7 h-7" />
+          </button>
         </div>
       </div>
 
@@ -162,6 +183,19 @@ export default function Header() {
                 <ClipboardList className="w-5 h-5" />
                 <span>Dashboard</span>
               </button>
+              {user && (
+                <Link
+                  href="/settings"
+                  onClick={closeMobileMenu}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                    pathname === '/settings' ? 'text-green-600 bg-green-50' : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+                  }`}
+                  title="Settings"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span>Settings</span>
+                </Link>
+              )}
             </nav>
 
             <div className="p-4 border-t">
