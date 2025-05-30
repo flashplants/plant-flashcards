@@ -9,7 +9,7 @@ import {
   X,
   Star,
   Eye,
-  Globe,
+  Binoculars,
   EyeOff,
   Filter,
   User,
@@ -62,6 +62,7 @@ export default function PlantFlashcardApp() {
   const [showAuth, setShowAuth] = useState(false);
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
   const [sightingsFilter, setSightingsFilter] = useState('all');
+  const [mySightingsFilter, setMySightingsFilter] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
   const { user, isAuthenticated } = useAuth();
@@ -197,8 +198,27 @@ export default function PlantFlashcardApp() {
             .filter(Boolean);
         }
 
-        // 2. Sightings filter
-        if (sightingsFilter !== 'all') {
+        // 2. Sightings filter (global or mySightings)
+        if (mySightingsFilter && user) {
+          // My Sightings filter
+          const minSightings = parseInt(mySightingsFilter);
+          const { data: sightingsData, error: sightingsError } = await supabase
+            .from('sightings')
+            .select('plant_id')
+            .eq('user_id', user.id);
+          if (sightingsError) {
+            console.error('Sightings data error:', sightingsError);
+            setFilteredPlants([]);
+            setIsFiltering(false);
+            return;
+          }
+          const plantSightings = {};
+          (sightingsData || []).forEach(s => {
+            plantSightings[s.plant_id] = (plantSightings[s.plant_id] || 0) + 1;
+          });
+          filtered = filtered.filter(plant => (plantSightings[plant.id] || 0) >= minSightings);
+        } else if (sightingsFilter !== 'all') {
+          // Global Sightings filter
           const minSightings = parseInt(sightingsFilter);
           filtered = filtered.filter(plant => {
             const sightingsCount = plant.global_sighting_counts?.[0]?.sighting_count || 0;
@@ -218,30 +238,7 @@ export default function PlantFlashcardApp() {
           }
         }
 
-        // 4. My Sightings filter (toggle)
-        if (mySightingsOnly) {
-          if (isAuthenticated) {
-            const { data: sightingsData, error: sightingsError } = await supabase
-              .from('sightings')
-              .select('plant_id')
-              .eq('user_id', user.id);
-            if (sightingsError) {
-              console.error('Sightings data error:', sightingsError);
-              setFilteredPlants([]);
-              setIsFiltering(false);
-              return;
-            }
-            const sightingIds = (sightingsData || []).map(s => s.plant_id);
-            filtered = filtered.filter(p => sightingIds.includes(p.id));
-          } else {
-            setShowAuth(true);
-            setMySightingsOnly(false);
-            setIsFiltering(false);
-            return;
-          }
-        }
-
-        // 5. Testable filter (toggle)
+        // 4. Testable filter (toggle)
         if (testableOnly) {
           if (isAuthenticated) {
             const { data: testableData, error: testableError } = await supabase
@@ -265,7 +262,7 @@ export default function PlantFlashcardApp() {
           }
         }
 
-        // 6. Need Practice filter
+        // 5. Need Practice filter
         if (needPractice && user) {
           const { data: practiceData, error: practiceError } = await supabase
             .rpc('get_plants_needing_practice', {
@@ -299,7 +296,7 @@ export default function PlantFlashcardApp() {
     };
 
     applyFilters();
-  }, [selectedCollection, plants, isAuthenticated, sightingsFilter, needPractice, favoritesOnly, mySightingsOnly, testableOnly, favorites, user, showAdminPlants]);
+  }, [selectedCollection, plants, isAuthenticated, sightingsFilter, mySightingsFilter, needPractice, favoritesOnly, testableOnly, favorites, user, showAdminPlants]);
 
   // Fetch user data when user changes
   useEffect(() => {
@@ -862,122 +859,157 @@ export default function PlantFlashcardApp() {
                   <Filter className="w-4 h-4 text-gray-600" />
                   <span className="font-medium text-gray-700">Filters</span>
                 </div>
+                <span className="ml-auto font-medium text-gray-600">Studying {filteredPlants.length > 0 ? filteredPlants.length : plants.length} plants</span>
                 <ChevronDown 
                   className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
                     isFiltersExpanded ? 'rotate-0' : '-rotate-90'
                   }`}
                 />
               </button>
-              
               <div className={`transition-all duration-300 ease-in-out ${
-                isFiltersExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                isFiltersExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'
               }`}>
-                <div className="p-4">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <Button
-                      onClick={() => {
-                        setSelectedCollection(null);
-                        setNeedPractice(false);
-                        setFavoritesOnly(false);
-                        setMySightingsOnly(false);
-                        setTestableOnly(false);
-                      }}
-                      variant={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'default' : 'outline'}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                      aria-pressed={!selectedCollection && !needPractice && !favoritesOnly && !mySightingsOnly && !testableOnly}
-                    >
-                      <Leaf className="w-4 h-4" />
-                      All Plants
-                      <Badge className="ml-2 bg-green-600 text-white font-semibold">{plants.length}</Badge>
-                    </Button>
-                    {user && (
-                      <>
-                        <Button
-                          onClick={() => setFavoritesOnly((prev) => !prev)}
-                          variant={favoritesOnly ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${favoritesOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={favoritesOnly}
-                        >
-                          <Star className="w-4 h-4" />
-                          Favorites
-                          <Badge className="ml-2 bg-green-600 text-white font-semibold">{getFavoritesCount()}</Badge>
-                        </Button>
-                        <Button
-                          onClick={() => setMySightingsOnly((prev) => !prev)}
-                          variant={mySightingsOnly ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={mySightingsOnly}
-                        >
-                          <Eye className="w-4 h-4" />
-                          My Sightings
-                        </Button>
-                        <Button
-                          onClick={() => setTestableOnly((prev) => !prev)}
-                          variant={testableOnly ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={testableOnly}
-                        >
-                          <Check className="w-4 h-4" />
-                          Test Me
-                        </Button>
-                        <Button
-                          onClick={() => setNeedPractice((prev) => !prev)}
-                          variant={needPractice ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${needPractice ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={needPractice}
-                        >
-                          <CircleDashed className="w-4 h-4" />
-                          Need Practice
-                        </Button>
-                      </>
-                    )}
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Main Filters Group */}
+                  <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+                    <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2"><Leaf className="w-4 h-4 text-green-600" /> Main Filters</div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => {
+                          setSelectedCollection(null);
+                          setNeedPractice(false);
+                          setFavoritesOnly(false);
+                          setTestableOnly(false);
+                        }}
+                        variant={!selectedCollection && !needPractice && !favoritesOnly && !testableOnly ? 'default' : 'outline'}
+                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${!selectedCollection && !needPractice && !favoritesOnly && !testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                        aria-pressed={!selectedCollection && !needPractice && !favoritesOnly && !testableOnly}
+                      >
+                        All Plants
+                        <Badge className="ml-2 bg-green-600 text-white font-semibold">{plants.length}</Badge>
+                      </Button>
+                      {user && (
+                        <>
+                          <Button
+                            onClick={() => setFavoritesOnly((prev) => !prev)}
+                            variant={favoritesOnly ? 'default' : 'outline'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${favoritesOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            aria-pressed={favoritesOnly}
+                          >
+                            <Star className="w-4 h-4" />
+                            Favorites
+                            <Badge className="ml-2 bg-green-600 text-white font-semibold">{getFavoritesCount()}</Badge>
+                          </Button>
+                          <Button
+                            onClick={() => setTestableOnly((prev) => !prev)}
+                            variant={testableOnly ? 'default' : 'outline'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${testableOnly ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            aria-pressed={testableOnly}
+                          >
+                            <Check className="w-4 h-4" />
+                            Test Me
+                          </Button>
+                          <Button
+                            onClick={() => setNeedPractice((prev) => !prev)}
+                            variant={needPractice ? 'default' : 'outline'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${needPractice ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            aria-pressed={needPractice}
+                          >
+                            <CircleDashed className="w-4 h-4" />
+                            Need Practice
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  
-                  {/* Sightings Filter */}
+                  {/* Sightings Filter Group */}
                   {showAdminSightings && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <Globe className="w-4 h-4 text-gray-600" />
-                      <div className="flex gap-2">
-                        <Button
-                          variant={sightingsFilter === 'all' ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={sightingsFilter === 'all'}
-                          onClick={() => setSightingsFilter('all')}
-                        >
-                          All
-                        </Button>
-                        <Button
-                          variant={sightingsFilter === '1' ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={sightingsFilter === '1'}
-                          onClick={() => setSightingsFilter('1')}
-                        >
-                          1+
-                        </Button>
-                        <Button
-                          variant={sightingsFilter === '2' ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={sightingsFilter === '2'}
-                          onClick={() => setSightingsFilter('2')}
-                        >
-                          2+
-                        </Button>
-                        <Button
-                          variant={sightingsFilter === '3' ? 'default' : 'outline'}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${sightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                          aria-pressed={sightingsFilter === '3'}
-                          onClick={() => setSightingsFilter('3')}
-                        >
-                          3+
-                        </Button>
+                    <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+                      <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2"><Binoculars className="w-4 h-4 text-gray-600" /> Sightings</div>
+                      {/* Global Sightings Buttons */}
+                      <div className="mb-2">
+                        <div className="font-medium text-gray-600 mb-1">Global Sightings</div>
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            variant={sightingsFilter === 'all' && !mySightingsFilter ? 'default' : 'outline'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${(sightingsFilter === 'all' && !mySightingsFilter) ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            aria-pressed={sightingsFilter === 'all' && !mySightingsFilter}
+                            onClick={() => { setSightingsFilter('all'); setMySightingsFilter(null); }}
+                          >
+                            All
+                          </Button>
+                          <Button
+                            variant={sightingsFilter === '1' && !mySightingsFilter ? 'default' : 'outline'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${(sightingsFilter === '1' && !mySightingsFilter) ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            aria-pressed={sightingsFilter === '1' && !mySightingsFilter}
+                            onClick={() => { setSightingsFilter('1'); setMySightingsFilter(null); }}
+                          >
+                            1+
+                          </Button>
+                          <Button
+                            variant={sightingsFilter === '2' && !mySightingsFilter ? 'default' : 'outline'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${(sightingsFilter === '2' && !mySightingsFilter) ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            aria-pressed={sightingsFilter === '2' && !mySightingsFilter}
+                            onClick={() => { setSightingsFilter('2'); setMySightingsFilter(null); }}
+                          >
+                            2+
+                          </Button>
+                          <Button
+                            variant={sightingsFilter === '3' && !mySightingsFilter ? 'default' : 'outline'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${(sightingsFilter === '3' && !mySightingsFilter) ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                            aria-pressed={sightingsFilter === '3' && !mySightingsFilter}
+                            onClick={() => { setSightingsFilter('3'); setMySightingsFilter(null); }}
+                          >
+                            3+
+                          </Button>
+                        </div>
                       </div>
+                      {/* My Sightings Buttons */}
+                      {user && (
+                        <div>
+                          <div className="font-medium text-gray-600 mb-1">My Sightings</div>
+                          <div className="flex gap-2 flex-wrap">
+                            <Button
+                              variant={mySightingsFilter === 'all' ? 'default' : 'outline'}
+                              className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                              aria-pressed={mySightingsFilter === 'all'}
+                              onClick={() => { setMySightingsFilter('all'); setSightingsFilter('all'); }}
+                            >
+                              All
+                            </Button>
+                            <Button
+                              variant={mySightingsFilter === '1' ? 'default' : 'outline'}
+                              className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                              aria-pressed={mySightingsFilter === '1'}
+                              onClick={() => { setMySightingsFilter('1'); setSightingsFilter('all'); }}
+                            >
+                              1+
+                            </Button>
+                            <Button
+                              variant={mySightingsFilter === '2' ? 'default' : 'outline'}
+                              className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                              aria-pressed={mySightingsFilter === '2'}
+                              onClick={() => { setMySightingsFilter('2'); setSightingsFilter('all'); }}
+                            >
+                              2+
+                            </Button>
+                            <Button
+                              variant={mySightingsFilter === '3' ? 'default' : 'outline'}
+                              className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${mySightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                              aria-pressed={mySightingsFilter === '3'}
+                              onClick={() => { setMySightingsFilter('3'); setSightingsFilter('all'); }}
+                            >
+                              3+
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                  
-                  {/* Collections Filter */}
+                  {/* Collections Filter Group */}
                   {showAdminCollections && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <Filter className="w-4 h-4 text-gray-600" />
+                    <div className="space-y-4 border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
+                      <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2"><Filter className="w-4 h-4 text-gray-600" /> Collections</div>
                       <div className="flex flex-wrap gap-2">
                         {collections && collections.length > 0 ? (
                           collections
