@@ -721,7 +721,9 @@ export default function PlantFlashcardApp() {
     const randomImage = images[Math.floor(Math.random() * images.length)];
     
     if (randomImage?.path) {
-      return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${randomImage.path}`;
+      // Use plant-images bucket for admin plants, user-plant-images for user plants
+      const bucket = plant.is_admin ? 'plant-images' : 'user-plant-images';
+      return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${randomImage.path}`;
     }
     return plant.image_url || null;
   };
