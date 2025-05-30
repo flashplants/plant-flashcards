@@ -3,10 +3,11 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, CircleGauge, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Leaf, LogIn, LogOut, GalleryHorizontalEnd, CircleGauge, Menu, X, User } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
+import { Badge } from "@/components/ui/badge";
 
 export default function Header() {
   const pathname = usePathname();
@@ -15,6 +16,7 @@ export default function Header() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const { user, signOut, supabase } = useAuth();
   
   useEffect(() => {
@@ -22,13 +24,15 @@ export default function Header() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('is_admin')
+          .select('is_admin, display_name')
           .eq('id', user.id)
           .single();
         
         setIsAdmin(profile?.is_admin || false);
+        setDisplayName(profile?.display_name || '');
       } else {
         setIsAdmin(false);
+        setDisplayName('');
       }
     };
 
@@ -74,6 +78,11 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-4">
+            {user && displayName && (
+              <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                {displayName}
+              </Badge>
+            )}
           </nav>
 
           <div className="flex items-center space-x-4">
@@ -154,6 +163,13 @@ export default function Header() {
             </div>
 
             <nav className="flex-1 px-4 py-6 space-y-4">
+              {user && displayName && (
+                <div className="px-3 py-2">
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                    {displayName}
+                  </Badge>
+                </div>
+              )}
               {user && (
                 <button
                   onClick={() => {

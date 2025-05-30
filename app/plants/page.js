@@ -21,6 +21,26 @@ export default function PlantsPage() {
   const [userSightings, setUserSightings] = useState({});
   const { user: authUser } = useAuth();
   const router = useRouter();
+  const [showAdminPlants, setShowAdminPlants] = useState(true);
+  const [showAdminCollections, setShowAdminCollections] = useState(true);
+  const [showAdminSightings, setShowAdminSightings] = useState(true);
+
+  useEffect(() => {
+    if (authUser) {
+      supabase
+        .from('profiles')
+        .select('show_admin_plants, show_admin_collections, show_admin_sightings')
+        .eq('id', authUser.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            if (typeof data.show_admin_plants === 'boolean') setShowAdminPlants(data.show_admin_plants);
+            if (typeof data.show_admin_collections === 'boolean') setShowAdminCollections(data.show_admin_collections);
+            if (typeof data.show_admin_sightings === 'boolean') setShowAdminSightings(data.show_admin_sightings);
+          }
+        });
+    }
+  }, [authUser]);
 
   useEffect(() => {
     fetchPlants();
@@ -28,7 +48,7 @@ export default function PlantsPage() {
     if (authUser) {
       fetchFavorites();
     }
-  }, [authUser]);
+  }, [authUser, showAdminPlants]);
 
   const fetchGlobalSightings = async (plantIds) => {
     if (!plantIds.length) return;
@@ -87,10 +107,14 @@ export default function PlantsPage() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setPlants(data || []);
+      let filtered = data || [];
+      if (authUser && !showAdminPlants) {
+        filtered = filtered.filter(plant => !plant.is_admin_plant || plant.user_id === authUser.id);
+      }
+      setPlants(filtered);
       
-      if (data && data.length) {
-        const plantIds = data.map(p => p.id);
+      if (filtered && filtered.length) {
+        const plantIds = filtered.map(p => p.id);
         fetchGlobalSightings(plantIds);
         if (authUser) {
           fetchUserSightings(plantIds);
@@ -169,6 +193,7 @@ export default function PlantsPage() {
     const collectionIds = plant.collection_plants?.map(cp => cp.collection_id) || [];
     return collections
       .filter(c => collectionIds.includes(c.id))
+      .filter(c => showAdminCollections || !c.is_admin_collection)
       .map(c => c.name);
   };
 
@@ -258,9 +283,11 @@ export default function PlantsPage() {
                       {name}
                     </Badge>
                   ))}
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
-                    Global sightings: {globalSightings[plant.id] || 0}
-                  </Badge>
+                  {showAdminSightings && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                      Global sightings: {globalSightings[plant.id] || 0}
+                    </Badge>
+                  )}
                   {authUser && (
                     <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
                       My sightings: {userSightings[plant.id] || 0}
