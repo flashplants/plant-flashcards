@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function Header() {
   const pathname = usePathname();
@@ -78,11 +80,48 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-4">
-            {user && displayName && (
-              <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
-                {displayName}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Dashboard button */}
+              {user && (
+                <Button
+                  variant="ghost"
+                  onClick={handleDashboardClick}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 text-base font-medium",
+                    pathname.startsWith("/dashboard") ? "text-green-600" : "text-gray-700 hover:text-green-600"
+                  )}
+                  title="Dashboard"
+                >
+                  <CircleGauge className="w-5 h-5" />
+                </Button>
+              )}
+              {/* Sign In/Out button */}
+              {user ? (
+                <Button
+                  variant="ghost"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-5 h-5" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowAuth(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600"
+                >
+                  <LogIn className="w-5 h-5" />
+                  Sign In
+                </Button>
+              )}
+              {/* Username badge */}
+              {user && displayName && (
+                <Badge className="ml-2 bg-green-100 text-green-800 font-semibold px-3 py-1 text-base rounded-full">
+                  {displayName}
+                </Badge>
+              )}
+            </div>
           </nav>
 
           <div className="flex items-center space-x-4">
@@ -98,41 +137,6 @@ export default function Header() {
                 <Menu className="block h-6 w-6" />
               )}
             </button>
-
-            {/* Desktop auth button */}
-            <div className="hidden md:flex items-center space-x-4">
-              {user && (
-                <button
-                  onClick={handleDashboardClick}
-                  className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                    pathname === '/dashboard'
-                      ? 'text-green-600 bg-green-50'
-                      : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-                  }`}
-                >
-                  <CircleGauge className="w-5 h-5" />
-                  <span>Dashboard</span>
-                </button>
-              )}
-              {user ? (
-                <button
-                  onClick={handleSignOut}
-                  disabled={isSigningOut}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50 disabled:opacity-50"
-                >
-                  <LogOut className="w-5 h-5" />
-                  <span>{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowAuth(true)}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50"
-                >
-                  <LogIn className="w-5 h-5" />
-                  <span>Sign In</span>
-                </button>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -163,29 +167,25 @@ export default function Header() {
             </div>
 
             <nav className="flex-1 px-4 py-6 space-y-4">
-              {user && displayName && (
-                <div className="px-3 py-2">
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
-                    {displayName}
-                  </Badge>
-                </div>
-              )}
-              {user && (
-                <button
-                  onClick={() => {
-                    closeMobileMenu();
-                    handleDashboardClick();
-                  }}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    pathname === '/dashboard'
-                      ? 'text-green-600 bg-green-50'
-                      : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
-                  }`}
-                >
-                  <CircleGauge className="w-5 h-5" />
-                  <span>Dashboard</span>
-                </button>
-              )}
+              <div className="px-3 py-2">
+                <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                  {displayName}
+                </Badge>
+              </div>
+              <button
+                onClick={() => {
+                  closeMobileMenu();
+                  handleDashboardClick();
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                  pathname === '/dashboard'
+                    ? 'text-green-600 bg-green-50'
+                    : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+                }`}
+              >
+                <CircleGauge className="w-5 h-5" />
+                <span>Dashboard</span>
+              </button>
             </nav>
 
             <div className="p-4 border-t">
