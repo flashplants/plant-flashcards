@@ -52,7 +52,9 @@ function Tooltip({ text, children }) {
   return (
     <span className="relative group">
       {children}
-      <span className="absolute left-0 top-full mt-2 z-10 max-w-[14rem] w-max whitespace-normal rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-800">
+      <span
+        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-10 w-[30vw] max-w-[30vw] min-w-[8rem] whitespace-normal rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-800"
+      >
         {text}
       </span>
     </span>
@@ -722,7 +724,7 @@ export default function PlantFlashcardApp() {
     
     if (randomImage?.path) {
       // Use plant-images bucket for admin plants, user-plant-images for user plants
-      const bucket = plant.is_admin ? 'plant-images' : 'user-plant-images';
+      const bucket = plant.is_admin_plant ? 'plant-images' : 'user-plant-images';
       return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${randomImage.path}`;
     }
     return plant.image_url || null;
