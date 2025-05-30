@@ -2032,13 +2032,13 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                               variant="ghost"
                               size="icon"
                               onClick={() => toggleFavorite(plant)}
-                              className={favorites.has(plant.id) ? 'text-red-500' : 'text-gray-400'}
+                              className={favorites.has(plant.id) ? 'text-yellow-500' : 'text-gray-400'}
                             >
                               <Star className={`w-5 h-5 ${favorites.has(plant.id) ? 'fill-current' : ''}`} />
                             </Button>
                           )}
-                          {/* Only show edit button for user's own plants */}
-                          {plant.user_id === authUser?.id && (
+                          {/* Show edit button for user's own plants or for admin plants if user is admin */}
+                          {(plant.user_id === authUser?.id || (isAdmin && plant.is_admin_plant)) && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -2047,8 +2047,8 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                               <Edit className="w-5 h-5" />
                             </Button>
                           )}
-                          {/* Only show delete button for user's own plants */}
-                          {plant.user_id === authUser?.id && (
+                          {/* Show delete button for user's own plants or for admin plants if user is admin */}
+                          {(plant.user_id === authUser?.id || (isAdmin && plant.is_admin_plant)) && (
                             <Button
                               variant="ghost"
                               size="icon"
