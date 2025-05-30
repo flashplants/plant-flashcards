@@ -100,7 +100,7 @@ const getCollectionName = (id, allCollections) => {
   return col ? col.name : 'Collection';
 };
 
-function DashboardContent() {
+function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -133,13 +133,10 @@ function DashboardContent() {
   const [expandedPlant, setExpandedPlant] = useState(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
-  const [user, setUser] = useState(null);
-  const [showAuth, setShowAuth] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { user: authUser } = useAuth();
   const router = useRouter();
   const [globalSightings, setGlobalSightings] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,15 +170,8 @@ function DashboardContent() {
           .select('is_admin')
           .eq('id', authUser.id)
           .single();
-        if (!profile?.is_admin) {
-          router.replace('/');
-          setLoading(false);
-          return;
-        }
-        setIsAdmin(true);
+        setIsAdmin(profile?.is_admin || false);
         fetchPlants();
-        setLoading(false);
-        return;
       }
       setLoading(false);
     };
@@ -362,6 +352,12 @@ function DashboardContent() {
   // Modify fetchPlants to handle search
   const fetchPlants = async () => {
     try {
+      if (!authUser) {
+        setPlants([]);
+        setLoading(false);
+        return;
+      }
+
       if (searchQuery.trim()) {
         await debouncedSearch(searchQuery);
         return;
@@ -428,6 +424,11 @@ function DashboardContent() {
         queryBuilder = queryBuilder.eq('is_published', selectedFilters.is_published);
       }
 
+      // If not admin, only show user's own plants and admin plants
+      if (!isAdmin) {
+        queryBuilder = queryBuilder.or(`user_id.eq.${authUser.id},is_admin_plant.eq.true`);
+      }
+
       const { count, error: countError } = await queryBuilder;
       if (countError) throw countError;
       setTotalCount(count);
@@ -453,6 +454,11 @@ function DashboardContent() {
       // Add published status filter if selected
       if (selectedFilters.is_published !== null) {
         plantsQuery = plantsQuery.eq('is_published', selectedFilters.is_published);
+      }
+
+      // If not admin, only show user's own plants and admin plants
+      if (!isAdmin) {
+        plantsQuery = plantsQuery.or(`user_id.eq.${authUser.id},is_admin_plant.eq.true`);
       }
 
       const { data, error } = await plantsQuery;
@@ -483,6 +489,11 @@ function DashboardContent() {
   }, [currentPage]);
 
   const handleEdit = (plant) => {
+    // Prevent non-admin users from editing admin plants
+    if (plant.is_admin_plant && !isAdmin) {
+      alert('You do not have permission to edit admin plants.');
+      return;
+    }
     // Get the collection_id from collection_plants if it exists
     const collectionId = plant.collection_plants?.[0]?.collection_id || null;
     setEditingPlant({ 
@@ -523,7 +534,9 @@ function DashboardContent() {
           image_url: plant.image_url,
           external_resources: plant.external_resources,
           slug: plant.slug,
-          default_collection_id: plant.default_collection_id
+          default_collection_id: plant.default_collection_id,
+          user_id: authUser.id,
+          is_admin_plant: isAdmin
         })
         .eq('id', plant.id);
 
@@ -588,7 +601,11 @@ function DashboardContent() {
       // Insert the plant
       const { data: plantData, error: insertError } = await supabase
         .from('plants')
-        .insert([newPlant])
+        .insert([{
+          ...newPlant,
+          user_id: authUser.id,
+          is_admin_plant: isAdmin
+        }])
         .select()
         .single();
 
@@ -909,24 +926,30 @@ function DashboardContent() {
     );
   }
 
-  if (!loading && !isAdmin) {
-    return null;
-  }
-
-  if (error) {
+  if (!loading && !authUser) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-red-50">
-        <div className="text-center p-8 bg-white rounded-lg shadow-lg">
-          <X className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Error Loading Plants</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={fetchPlants}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Try Again
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Please Sign In</h2>
+            <p className="text-gray-600 mb-4">You need to be signed in to access the dashboard.</p>
+            <button
+              onClick={() => setShowAuth(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Sign In
+            </button>
+          </div>
         </div>
+        <AuthModal 
+          isOpen={showAuth} 
+          onClose={() => setShowAuth(false)}
+          onSuccess={(user) => {
+            setUser(user);
+            setAuthUser(user);
+          }}
+        />
       </div>
     );
   }
@@ -940,7 +963,7 @@ function DashboardContent() {
           onClose={() => setShowAuth(false)}
           onSuccess={(user) => {
             setUser(user);
-            fetchUserData();
+            setAuthUser(user);
           }}
         />
 
@@ -1252,6 +1275,223 @@ function DashboardContent() {
 
           {/* Plants List */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            {/* New Plant Form */}
+            {showNewPlantForm && (
+              <div className="p-6 border-b">
+                <Card className="border-0 shadow-none">
+                  <CardContent className="p-0 space-y-4">
+                    <div className="border-b pb-4">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Add New Plant
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Fill in the plant details below
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Scientific Name Fields */}
+                      <div className="space-y-2">
+                        <Label htmlFor="new-genus" className="flex items-center gap-1">
+                          Genus
+                          <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="new-genus"
+                          value={newPlant.genus || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, genus: e.target.value })}
+                          required
+                          className={!newPlant.genus ? "border-red-300 focus:ring-red-500" : ""}
+                        />
+                        {!newPlant.genus && (
+                          <p className="text-sm text-red-500">Genus is required</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-specific_epithet">Specific Epithet</Label>
+                        <Input
+                          id="new-specific_epithet"
+                          value={newPlant.specific_epithet || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, specific_epithet: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="new-hybrid_marker"
+                            checked={newPlant.hybrid_marker === 'x'}
+                            onChange={(e) => setNewPlant({ 
+                              ...newPlant, 
+                              hybrid_marker: e.target.checked ? 'x' : '',
+                              hybrid_marker_position: e.target.checked ? newPlant.hybrid_marker_position : 'none'
+                            })}
+                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          <Label htmlFor="new-hybrid_marker">Hybrid (x)</Label>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-hybrid_marker_position">Hybrid Marker Position</Label>
+                        <select
+                          id="new-hybrid_marker_position"
+                          value={newPlant.hybrid_marker_position || 'none'}
+                          onChange={(e) => setNewPlant({ ...newPlant, hybrid_marker_position: e.target.value })}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          disabled={!newPlant.hybrid_marker}
+                        >
+                          <option value="none">None</option>
+                          <option value="before_genus">Before Genus</option>
+                          <option value="between_genus_species">Between Genus and Species</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-infraspecies_rank">Infraspecies Rank</Label>
+                        <select
+                          id="new-infraspecies_rank"
+                          value={newPlant.infraspecies_rank || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, infraspecies_rank: e.target.value })}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                        >
+                          <option value="">None</option>
+                          <option value="f.">f.</option>
+                          <option value="var.">var.</option>
+                          <option value="subsp.">subsp.</option>
+                          <option value="ssp.">ssp.</option>
+                          <option value="Purpureus Group">Purpureus Group</option>
+                          <option value="Hybrids">Hybrids</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-infraspecies_epithet">Infraspecies Epithet</Label>
+                        <Input
+                          id="new-infraspecies_epithet"
+                          value={newPlant.infraspecies_epithet || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, infraspecies_epithet: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-variety">Variety</Label>
+                        <Input
+                          id="new-variety"
+                          value={newPlant.variety || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, variety: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-cultivar">Cultivar</Label>
+                        <Input
+                          id="new-cultivar"
+                          value={newPlant.cultivar || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, cultivar: e.target.value })}
+                        />
+                      </div>
+
+                      {/* Common Name and Family */}
+                      <div className="space-y-2">
+                        <Label htmlFor="new-common_name">Common Name</Label>
+                        <Input
+                          id="new-common_name"
+                          value={newPlant.common_name || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, common_name: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-family" className="flex items-center gap-1">
+                          Family
+                          <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="new-family"
+                          value={newPlant.family || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, family: e.target.value })}
+                          required
+                          className={!newPlant.family ? "border-red-300 focus:ring-red-500" : ""}
+                        />
+                        {!newPlant.family && (
+                          <p className="text-sm text-red-500">Family is required</p>
+                        )}
+                      </div>
+
+                      {/* Additional Information */}
+                      <div className="space-y-2">
+                        <Label htmlFor="new-native_to">Native To</Label>
+                        <Input
+                          id="new-native_to"
+                          value={newPlant.native_to || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, native_to: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-bloom_period">Bloom Period</Label>
+                        <Input
+                          id="new-bloom_period"
+                          value={newPlant.bloom_period || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, bloom_period: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-slug">Slug</Label>
+                        <Input
+                          id="new-slug"
+                          value={newPlant.slug || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, slug: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-collection_id">Collection</Label>
+                        <select
+                          id="new-collection_id"
+                          value={newPlant.collection_id || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, collection_id: e.target.value ? parseInt(e.target.value) : null })}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                        >
+                          <option value="">No Collection</option>
+                          {collections.map(col => (
+                            <option key={col.id} value={col.id}>{col.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="new-description">Description</Label>
+                        <Textarea
+                          id="new-description"
+                          value={newPlant.description || ''}
+                          onChange={(e) => setNewPlant({ ...newPlant, description: e.target.value })}
+                          rows={3}
+                        />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="new-is_published"
+                            checked={newPlant.is_published}
+                            onChange={(e) => setNewPlant({ ...newPlant, is_published: e.target.checked })}
+                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          <Label htmlFor="new-is_published">Published</Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowNewPlantForm(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleCreate}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Create Plant
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
             <div className="divide-y divide-gray-200">
               {filteredPlants.map((plant) => (
                 <div 
@@ -1263,7 +1503,7 @@ function DashboardContent() {
                     <div className="w-32 h-32 flex-shrink-0">
                       {plant.plant_images?.[0] ? (
                         <img
-                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[0].path}`}
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.plant_images[0].path.startsWith(user?.id) ? 'user-plant-images' : 'plant-images'}/${plant.plant_images[0].path}`}
                           alt={renderPlantName(plant).join(' ')}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -1516,6 +1756,15 @@ function DashboardContent() {
                             }`}>
                               {plant.is_published ? 'Published' : 'Draft'}
                             </span>
+                            {plant.is_admin_plant ? (
+                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                                Admin Plant
+                              </span>
+                            ) : plant.user_id === authUser?.id ? (
+                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                My Plant
+                              </span>
+                            ) : null}
                           </div>
                           <p className="text-sm text-gray-500">
                             {plant.common_name}
@@ -1604,21 +1853,27 @@ function DashboardContent() {
                               <Star className={`w-5 h-5 ${favorites.has(plant.id) ? 'fill-current' : ''}`} />
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(plant)}
-                          >
-                            <Edit className="w-5 h-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(plant.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
+                          {/* Only show edit button for user's own plants */}
+                          {plant.user_id === authUser?.id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(plant)}
+                            >
+                              <Edit className="w-5 h-5" />
+                            </Button>
+                          )}
+                          {/* Only show delete button for user's own plants */}
+                          {plant.user_id === authUser?.id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(plant.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1647,13 +1902,68 @@ function DashboardContent() {
 }
 
 export default function PlantsDashboard() {
-  return (
-    <Suspense fallback={
+  const [user, setUser] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUser(user);
+          setAuthUser(user);
+        }
+      } catch (error) {
+        console.error('Error checking user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkUser();
+  }, []);
+
+  if (loading) {
+    return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
-    }>
-      <DashboardContent />
-    </Suspense>
-  );
+    );
+  }
+
+  if (!loading && !authUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Please Sign In</h2>
+            <p className="text-gray-600 mb-4">You need to be signed in to access the dashboard.</p>
+            <button
+              onClick={() => setShowAuth(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Sign In
+            </button>
+          </div>
+        </div>
+        <AuthModal 
+          isOpen={showAuth} 
+          onClose={() => setShowAuth(false)}
+          onSuccess={(user) => {
+            setUser(user);
+            setAuthUser(user);
+          }}
+        />
+      </div>
+    );
+  }
+
+  return <DashboardContent 
+    user={user} 
+    authUser={authUser} 
+    showAuth={showAuth}
+    setShowAuth={setShowAuth}
+  />;
 } 

@@ -46,18 +46,8 @@ export async function middleware(req: NextRequest) {
       redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname)
       return NextResponse.redirect(redirectUrl)
     }
-
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', session.user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      // Not an admin - redirect to home
-      return NextResponse.redirect(new URL('/', req.url))
-    }
+    // Allow access to all authenticated users
+    return res
   }
 
   // If user is signed in and on home page with redirect param

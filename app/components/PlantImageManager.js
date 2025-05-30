@@ -68,7 +68,7 @@ function buildFilename({ genus, specific_epithet, infraspecies_rank, variety, cu
 }
 
 const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infraspecies_rank, variety, cultivar, onImagesChange }) => {
-  const { supabase } = useAuth();
+  const { supabase, user } = useAuth();
   const [existingImages, setExistingImages] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
   const [dragActive, setDragActive] = useState(false);
@@ -80,14 +80,14 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
   const loadExistingImages = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: images, error } = await supabase
         .from('plant_images')
         .select('*')
         .eq('plant_id', plantId)
         .order('is_primary', { ascending: false });
 
       if (error) throw error;
-      setExistingImages(data || []);
+      setExistingImages(images || []);
     } catch (error) {
       console.error('Error loading images:', error);
     } finally {
@@ -184,12 +184,32 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
       const baseName = buildFilename({ genus, specific_epithet, infraspecies_rank, variety, cultivar });
       const suffix = generateSuffix();
       const fileName = `${baseName}-${suffix}.webp`;
-      const storagePath = `${plantId}/${fileName}`;
+      
+      // Get the current session and check if user is admin
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Check if user is admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile) {
+        throw new Error('User profile not found');
+      }
+
+      // Use plant-images bucket for admins, user-plant-images for regular users
+      const bucketName = profile.is_admin ? 'plant-images' : 'user-plant-images';
+      const storagePath = `${session.user.id}/${fileName}`;
 
       updateFileStatus(fileObj.id, 'uploading', 50);
       try {
         const { error: uploadError } = await supabase.storage
-          .from('plant-images')
+          .from(bucketName)
           .upload(storagePath, webpBlob, {
             contentType: 'image/webp',
             cacheControl: '3600'
@@ -332,7 +352,7 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
               <div key={image.id} className="relative group">
                 <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
                   <img
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${image.path}`}
+                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${image.path.startsWith(user?.id) ? 'user-plant-images' : 'plant-images'}/${image.path}`}
                     alt="Plant"
                     className="w-full h-full object-cover"
                   />

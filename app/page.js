@@ -51,7 +51,7 @@ function PlantList() {
     if (user) {
       router.push('/flashcards');
     } else {
-      router.push('/?redirectedFrom=/flashcards');
+      setShowAuth(true);
     }
   };
 
@@ -59,7 +59,7 @@ function PlantList() {
     if (user) {
       router.push('/dashboard');
     } else {
-      router.push('/?redirectedFrom=/dashboard');
+      setShowAuth(true);
     }
   };
 
@@ -93,20 +93,41 @@ function PlantList() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={handleStartLearning}
-              className="flex items-center justify-center gap-2 px-8 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-lg font-medium"
-            >
-              <Leaf className="w-6 h-6" />
-              Start Learning
-            </button>
-            <button
-              onClick={handleManagePlants}
-              className="flex items-center justify-center gap-2 px-8 py-4 bg-white text-green-600 rounded-lg hover:bg-gray-50 transition-colors text-lg font-medium border border-green-200"
-            >
-              <LayoutDashboard className="w-6 h-6" />
-              Manage Plants
-            </button>
+            {user ? (
+              <>
+                <Link
+                  href="/flashcards"
+                  className="flex items-center justify-center gap-2 px-8 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-lg font-medium"
+                >
+                  <Leaf className="w-6 h-6" />
+                  Start Learning
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="flex items-center justify-center gap-2 px-8 py-4 bg-white text-green-600 rounded-lg hover:bg-gray-50 transition-colors text-lg font-medium border border-green-200"
+                >
+                  <LayoutDashboard className="w-6 h-6" />
+                  Manage Plants
+                </Link>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleStartLearning}
+                  className="flex items-center justify-center gap-2 px-8 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-lg font-medium"
+                >
+                  <Leaf className="w-6 h-6" />
+                  Start Learning
+                </button>
+                <button
+                  onClick={handleManagePlants}
+                  className="flex items-center justify-center gap-2 px-8 py-4 bg-white text-green-600 rounded-lg hover:bg-gray-50 transition-colors text-lg font-medium border border-green-200"
+                >
+                  <LayoutDashboard className="w-6 h-6" />
+                  Manage Plants
+                </button>
+              </>
+            )}
           </div>
 
           <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-4xl mx-auto">

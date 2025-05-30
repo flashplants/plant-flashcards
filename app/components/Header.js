@@ -49,11 +49,8 @@ export default function Header() {
     }
   };
 
-  const handleDashboardClick = (e) => {
-    if (!isAdmin) {
-      e.preventDefault();
-      setShowAuth(true);
-    }
+  const handleDashboardClick = () => {
+    router.push('/dashboard');
   };
 
   const toggleMobileMenu = () => {
@@ -95,9 +92,8 @@ export default function Header() {
 
             {/* Desktop auth button */}
             <div className="hidden md:flex items-center space-x-4">
-              {isAdmin && (
-                <Link
-                  href="/dashboard"
+              {user && (
+                <button
                   onClick={handleDashboardClick}
                   className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                     pathname === '/dashboard'
@@ -107,7 +103,7 @@ export default function Header() {
                 >
                   <CircleGauge className="w-5 h-5" />
                   <span>Dashboard</span>
-                </Link>
+                </button>
               )}
               {user ? (
                 <button
@@ -158,12 +154,11 @@ export default function Header() {
             </div>
 
             <nav className="flex-1 px-4 py-6 space-y-4">
-              {isAdmin && (
-                <Link
-                  href="/dashboard"
-                  onClick={(e) => {
+              {user && (
+                <button
+                  onClick={() => {
                     closeMobileMenu();
-                    handleDashboardClick(e);
+                    handleDashboardClick();
                   }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                     pathname === '/dashboard'
@@ -173,7 +168,7 @@ export default function Header() {
                 >
                   <CircleGauge className="w-5 h-5" />
                   <span>Dashboard</span>
-                </Link>
+                </button>
               )}
             </nav>
 
