@@ -378,7 +378,7 @@ function DashboardContent() {
         setTotalPages(Math.ceil(plantIds.length / pageSize));
         const pagedPlantIds = plantIds.slice((currentPage - 1) * pageSize, currentPage * pageSize);
         if (pagedPlantIds.length > 0) {
-          const { data, error } = await supabase
+          let queryBuilder = supabase
             .from('plants')
             .select(`
               *,
@@ -393,6 +393,13 @@ function DashboardContent() {
             `)
             .in('id', pagedPlantIds)
             .order('scientific_name');
+
+          // Add published status filter if selected
+          if (selectedFilters.is_published !== null) {
+            queryBuilder = queryBuilder.eq('is_published', selectedFilters.is_published);
+          }
+
+          const { data, error } = await queryBuilder;
           if (error) throw error;
           setPlants(data || []);
           setLoading(false);
@@ -412,13 +419,22 @@ function DashboardContent() {
         }
       }
       // Default: fetch all plants paginated
-      const { count, error: countError } = await supabase
+      let queryBuilder = supabase
         .from('plants')
         .select('*', { count: 'exact', head: true });
+
+      // Add published status filter if selected
+      if (selectedFilters.is_published !== null) {
+        queryBuilder = queryBuilder.eq('is_published', selectedFilters.is_published);
+      }
+
+      const { count, error: countError } = await queryBuilder;
       if (countError) throw countError;
       setTotalCount(count);
       setTotalPages(Math.ceil(count / pageSize));
-      const { data, error } = await supabase
+
+      // Fetch the actual plants
+      let plantsQuery = supabase
         .from('plants')
         .select(`
           *,
@@ -433,6 +449,13 @@ function DashboardContent() {
         `)
         .order('scientific_name')
         .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
+      // Add published status filter if selected
+      if (selectedFilters.is_published !== null) {
+        plantsQuery = plantsQuery.eq('is_published', selectedFilters.is_published);
+      }
+
+      const { data, error } = await plantsQuery;
       if (error) throw error;
       setPlants(data || []);
       setLoading(false);
