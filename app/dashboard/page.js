@@ -70,18 +70,64 @@ const generateSuffix = () => {
   return Math.random().toString(36).substring(2, 6);
 };
 
+// Helper function to generate a slug from a name
+const generateSlug = async (name) => {
+  // Convert name to lowercase and replace spaces with hyphens
+  let baseSlug = name.toLowerCase().replace(/\s+/g, '-');
+  
+  // Remove any characters that aren't letters, numbers, or hyphens
+  baseSlug = baseSlug.replace(/[^a-z0-9-]/g, '');
+  
+  // Start with the base slug
+  let slug = baseSlug;
+  let counter = 1;
+  
+  // Keep trying until we find a unique slug
+  while (true) {
+    // Check if this slug exists
+    const { data, error } = await supabase
+      .from('collections')
+      .select('slug')
+      .eq('slug', slug)
+      .maybeSingle();
+    
+    // If no record found or error occurred, we can use this slug
+    if (error || !data) {
+      return slug;
+    }
+    
+    // If we found a record, try the next number
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+};
+
 // Add this helper function near the top with other helper functions
-const generateSlug = async (name, existingCollections = []) => {
-  let baseSlug = name
+const generatePlantSlug = async (plant, existingPlants = []) => {
+  // Build the base slug from the plant's scientific name
+  let baseSlug = [plant.genus, plant.specific_epithet, plant.infraspecies_rank, plant.infraspecies_epithet, plant.variety, plant.cultivar]
+    .filter(Boolean)
+    .join('-')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
   
-  // Check if the slug already exists
+  // Check if the slug already exists in the database
   let slug = baseSlug;
   let counter = 1;
   
-  while (existingCollections.some(c => c.slug === slug)) {
+  while (true) {
+    const { data, error } = await supabase
+      .from('plants')
+      .select('slug')
+      .eq('slug', slug)
+      .single();
+    
+    if (error && error.code === 'PGRST116') {
+      // No matching slug found, we can use this one
+      break;
+    }
+    
     slug = `${baseSlug}-${counter}`;
     counter++;
   }
@@ -139,6 +185,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
   const [globalSightings, setGlobalSightings] = useState({});
+  const [userSightings, setUserSightings] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [open, setOpen] = useState(false);
@@ -212,6 +259,24 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
     }
   }, []);
 
+  // Fetch user sightings counts for all plants on page
+  const fetchUserSightings = useCallback(async (plantIds) => {
+    if (!plantIds.length || !authUser) return;
+    const { data, error } = await supabase
+      .from('sightings')
+      .select('plant_id')
+      .eq('user_id', authUser.id)
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      // Count occurrences of each plant_id
+      data.forEach(row => {
+        counts[row.plant_id] = (counts[row.plant_id] || 0) + 1;
+      });
+      setUserSightings(counts);
+    }
+  }, [authUser]);
+
   // Fetch suggestions
   const fetchSuggestions = async (query) => {
     if (!query.trim()) {
@@ -243,21 +308,32 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
   // Fetch collections for filter
   useEffect(() => {
     const fetchCollections = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('collections')
-        .select('id, name, description, is_published, user_id')
+        .select('id, name, description, is_published, user_id, is_admin_collection')
         .order('name');
+
+      // If admin, only show admin collections
+      if (isAdmin) {
+        query = query.eq('is_admin_collection', true);
+      } else {
+        // If regular user, show their own collections and admin collections
+        query = query.or(`user_id.eq.${authUser.id},is_admin_collection.eq.true`);
+      }
+
+      const { data, error } = await query;
       if (!error && data) {
-        // Ensure all collections have the correct boolean value for is_published
+        // Ensure all collections have the correct boolean values
         const formattedCollections = data.map(collection => ({
           ...collection,
-          is_published: Boolean(collection.is_published)
+          is_published: Boolean(collection.is_published),
+          is_admin_collection: Boolean(collection.is_admin_collection)
         }));
         setCollections(formattedCollections);
       }
     };
     fetchCollections();
-  }, []);
+  }, [isAdmin, authUser]);
 
   // Modify the search function to include filters
   const debouncedSearch = useCallback(
@@ -317,6 +393,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
           } else {
             setPlants([]);
             setGlobalSightings({});
+            setUserSightings({});
             setTotalCount(0);
             setTotalPages(1);
             setIsSearching(false);
@@ -330,8 +407,12 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
         setTotalPages(Math.ceil((data?.length || 0) / pageSize));
         if (data && data.length) {
           fetchGlobalSightings(data.map(p => p.id));
+          if (!isAdmin) {
+            fetchUserSightings(data.map(p => p.id));
+          }
         } else {
           setGlobalSightings({});
+          setUserSightings({});
         }
       } catch (err) {
         console.error('Search error:', err);
@@ -401,13 +482,18 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
           setLoading(false);
           if (data && data.length) {
             fetchGlobalSightings(data.map(p => p.id));
+            if (!isAdmin) {
+              fetchUserSightings(data.map(p => p.id));
+            }
           } else {
             setGlobalSightings({});
+            setUserSightings({});
           }
           return;
         } else {
           setPlants([]);
           setGlobalSightings({});
+          setUserSightings({});
           setTotalCount(0);
           setTotalPages(1);
           setLoading(false);
@@ -467,8 +553,12 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
       setLoading(false);
       if (data && data.length) {
         fetchGlobalSightings(data.map(p => p.id));
+        if (!isAdmin) {
+          fetchUserSightings(data.map(p => p.id));
+        }
       } else {
         setGlobalSightings({});
+        setUserSightings({});
       }
     } catch (err) {
       setError(err.message);
@@ -598,11 +688,15 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
         return;
       }
 
+      // Generate a slug for the plant
+      const slug = await generatePlantSlug(newPlant, plants);
+
       // Insert the plant
       const { data: plantData, error: insertError } = await supabase
         .from('plants')
         .insert([{
           ...newPlant,
+          slug,
           user_id: authUser.id,
           is_admin_plant: isAdmin
         }])
@@ -775,42 +869,42 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
     );
   };
 
-  // Increment/decrement global sightings
-  const updateGlobalSighting = async (plantId, delta) => {
-    const current = globalSightings[plantId] || 0;
+  // Add user sighting update function
+  const updateUserSighting = async (plantId, delta) => {
+    const current = userSightings[plantId] || 0;
     const newCount = Math.max(0, current + delta);
-    setGlobalSightings(prev => ({ ...prev, [plantId]: newCount })); // Optimistic
+    setUserSightings(prev => ({ ...prev, [plantId]: newCount })); // Optimistic
     let error = null;
     if (delta > 0) {
-      // Insert a new row into global_sightings
+      // Insert a new row into sightings
       ({ error } = await supabase
-        .from('global_sightings')
-        .insert({ plant_id: plantId }));
+        .from('sightings')
+        .insert({ plant_id: plantId, user_id: authUser.id }));
     } else if (delta < 0 && current > 0) {
       // Delete one row for this plant_id (the oldest)
-      // Get the oldest id for this plant
       const { data: rows, error: fetchError } = await supabase
-        .from('global_sightings')
+        .from('sightings')
         .select('id')
         .eq('plant_id', plantId)
+        .eq('user_id', authUser.id)
         .order('id', { ascending: true })
         .limit(1);
       if (!fetchError && rows && rows.length > 0) {
         const rowId = rows[0].id;
         ({ error } = await supabase
-          .from('global_sightings')
+          .from('sightings')
           .delete()
           .eq('id', rowId));
       } else {
-        error = fetchError || new Error('No global sighting row to delete');
+        error = fetchError || new Error('No sighting row to delete');
       }
     }
     // Always re-fetch counts after change
-    await fetchGlobalSightings(plants.map(p => p.id));
+    await fetchUserSightings(plants.map(p => p.id));
     if (error) {
       // Revert on error
-      setGlobalSightings(prev => ({ ...prev, [plantId]: current }));
-      alert('Failed to update global sightings: ' + (error.message || error));
+      setUserSightings(prev => ({ ...prev, [plantId]: current }));
+      alert('Failed to update sightings: ' + (error.message || error));
     }
   };
 
@@ -821,25 +915,49 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
         return;
       }
 
-      const slug = await generateSlug(newCollection.name, collections);
+      // Start with base slug
+      let baseSlug = newCollection.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      let slug = baseSlug;
+      let counter = 1;
+      let success = false;
+      let data;
 
-      const { data, error } = await supabase
-        .from('collections')
-        .insert([{
-          ...newCollection,
-          is_published: Boolean(newCollection.is_published),
-          user_id: authUser.id,
-          slug: slug
-        }])
-        .select()
-        .single();
+      // Keep trying until we succeed
+      while (!success) {
+        try {
+          const result = await supabase
+            .from('collections')
+            .insert([{
+              ...newCollection,
+              is_published: Boolean(newCollection.is_published),
+              user_id: authUser.id,
+              is_admin_collection: isAdmin,
+              slug: slug
+            }])
+            .select()
+            .single();
 
-      if (error) throw error;
+          if (result.error) throw result.error;
+          
+          data = result.data;
+          success = true;
+        } catch (err) {
+          // If it's a unique constraint violation, try the next number
+          if (err.code === '23505' && err.message.includes('collections_slug_key')) {
+            slug = `${baseSlug}-${counter}`;
+            counter++;
+          } else {
+            // If it's any other error, throw it
+            throw err;
+          }
+        }
+      }
 
-      // Ensure the new collection has the correct boolean value
+      // Ensure the new collection has the correct boolean values
       const formattedCollection = {
         ...data,
-        is_published: Boolean(data.is_published)
+        is_published: Boolean(data.is_published),
+        is_admin_collection: Boolean(data.is_admin_collection)
       };
 
       setCollections(prev => [...prev, formattedCollection]);
@@ -860,6 +978,12 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
         return;
       }
 
+      // Prevent non-admin users from editing admin collections
+      if (collection.is_admin_collection && !isAdmin) {
+        alert('You do not have permission to edit admin collections.');
+        return;
+      }
+
       // Only generate a new slug if the name has changed
       const existingCollection = collections.find(c => c.id === collection.id);
       const slug = existingCollection?.name !== collection.name 
@@ -872,16 +996,18 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
           name: collection.name,
           description: collection.description || '',
           is_published: Boolean(collection.is_published),
+          is_admin_collection: isAdmin ? collection.is_admin_collection : false,
           slug: slug
         })
         .eq('id', collection.id);
 
       if (error) throw error;
 
-      // Ensure the updated collection has the correct boolean value
+      // Ensure the updated collection has the correct boolean values
       const formattedCollection = {
         ...collection,
         is_published: Boolean(collection.is_published),
+        is_admin_collection: isAdmin ? Boolean(collection.is_admin_collection) : false,
         slug: slug
       };
 
@@ -895,6 +1021,13 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
   };
 
   const handleDeleteCollection = async (collectionId) => {
+    // Prevent non-admin users from deleting admin collections
+    const collection = collections.find(c => c.id === collectionId);
+    if (collection?.is_admin_collection && !isAdmin) {
+      alert('You do not have permission to delete admin collections.');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this collection? This will also remove all plant associations.')) return;
 
     try {
@@ -1067,6 +1200,18 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                             />
                             <Label htmlFor={`edit-published-${collection.id}`}>Published</Label>
                           </div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`edit-admin-${collection.id}`}
+                                checked={editingCollection.is_admin_collection || false}
+                                onChange={(e) => setEditingCollection(prev => ({ ...prev, is_admin_collection: e.target.checked }))}
+                                className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                              />
+                              <Label htmlFor={`edit-admin-${collection.id}`}>Admin Collection</Label>
+                            </div>
+                          )}
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
@@ -1095,7 +1240,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                               }`}>
                                 {collection.is_published ? 'Published' : 'Draft'}
                               </span>
-                              {isAdmin ? (
+                              {collection.is_admin_collection ? (
                                 <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
                                   Admin Collection
                                 </span>
@@ -1107,26 +1252,31 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setEditingCollection({
-                                ...collection,
-                                name: collection.name || '',
-                                description: collection.description || '',
-                                is_published: collection.is_published || false
-                              })}
-                            >
-                              <FolderEdit className="w-5 h-5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteCollection(collection.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </Button>
+                            {(!collection.is_admin_collection || isAdmin) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setEditingCollection({
+                                  ...collection,
+                                  name: collection.name || '',
+                                  description: collection.description || '',
+                                  is_published: collection.is_published || false,
+                                  is_admin_collection: collection.is_admin_collection || false
+                                })}
+                              >
+                                <FolderEdit className="w-5 h-5" />
+                              </Button>
+                            )}
+                            {(!collection.is_admin_collection || isAdmin) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteCollection(collection.id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1503,8 +1653,8 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                     <div className="w-32 h-32 flex-shrink-0">
                       {plant.plant_images?.[0] ? (
                         <img
-                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.plant_images[0].path.startsWith(user?.id) ? 'user-plant-images' : 'plant-images'}/${plant.plant_images[0].path}`}
-                          alt={renderPlantName(plant).join(' ')}
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path.startsWith(user?.id) ? 'user-plant-images' : 'plant-images'}/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path}`}
+                          alt={renderPlantName(plant)}
                           className="w-full h-full object-cover rounded-lg"
                         />
                       ) : (
@@ -1811,26 +1961,28 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                               )}
                             </div>
                           )}
-                          {/* Global Sightings Row */}
+                          {/* Sightings Row */}
                           <div className="flex items-center gap-2 mt-2">
-                            <span className="text-sm text-gray-600 font-medium">Global Sightings:</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => updateGlobalSighting(plant.id, -1)}
-                              disabled={(globalSightings[plant.id] || 0) <= 0}
-                              aria-label="Decrease global sightings"
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span className="text-base font-semibold min-w-[2ch] text-center">
-                              {globalSightings[plant.id] ?? 0}
+                            <span className="text-sm text-gray-600 font-medium">
+                              {isAdmin ? 'Global Sightings:' : 'My Sightings:'}
                             </span>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => updateGlobalSighting(plant.id, 1)}
-                              aria-label="Increase global sightings"
+                              onClick={() => isAdmin ? updateGlobalSighting(plant.id, -1) : updateUserSighting(plant.id, -1)}
+                              disabled={(isAdmin ? globalSightings[plant.id] : userSightings[plant.id]) <= 0}
+                              aria-label={`Decrease ${isAdmin ? 'global' : 'my'} sightings`}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                            <span className="text-base font-semibold min-w-[2ch] text-center">
+                              {isAdmin ? (globalSightings[plant.id] ?? 0) : (userSightings[plant.id] ?? 0)}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => isAdmin ? updateGlobalSighting(plant.id, 1) : updateUserSighting(plant.id, 1)}
+                              aria-label={`Increase ${isAdmin ? 'global' : 'my'} sightings`}
                             >
                               <Plus className="w-4 h-4" />
                             </Button>

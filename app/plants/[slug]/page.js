@@ -31,9 +31,16 @@ export default function PlantDetailPage({ params }) {
     }
   }, [slug, authUser]);
 
+  useEffect(() => {
+    if (plant?.plant_images?.length > 0) {
+      const primaryIndex = plant.plant_images.findIndex(img => img.is_primary);
+      setCurrentImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
+    }
+  }, [plant]);
+
   const fetchPlant = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('plants')
         .select(`
           *,
@@ -46,9 +53,17 @@ export default function PlantDetailPage({ params }) {
             collection_id
           )
         `)
-        .eq('slug', slug)
-        .eq('is_published', true)
-        .single();
+        .eq('slug', slug);
+
+      // If user is logged in, allow access to their own plants
+      if (authUser) {
+        query = query.or(`is_published.eq.true,user_id.eq.${authUser.id}`);
+      } else {
+        // If not logged in, only allow access to published plants
+        query = query.eq('is_published', true);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) throw error;
       setPlant(data);
@@ -187,7 +202,7 @@ export default function PlantDetailPage({ params }) {
             <div className="aspect-square relative bg-white rounded-lg overflow-hidden">
               {plant.plant_images?.[currentImageIndex] ? (
                 <img
-                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[currentImageIndex].path}`}
+                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.plant_images[currentImageIndex].path.startsWith(authUser?.id) ? 'user-plant-images' : 'plant-images'}/${plant.plant_images[currentImageIndex].path}`}
                   alt={renderPlantName(plant)}
                   className="w-full h-full object-cover"
                 />
@@ -238,7 +253,7 @@ export default function PlantDetailPage({ params }) {
                     onClick={() => setCurrentImageIndex(index)}
                   >
                     <img
-                      src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${image.path}`}
+                      src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${image.path.startsWith(authUser?.id) ? 'user-plant-images' : 'plant-images'}/${image.path}`}
                       alt={`${renderPlantName(plant)} - Image ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
@@ -252,9 +267,7 @@ export default function PlantDetailPage({ params }) {
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                <div className="flex items-center space-x-2">
-                  {renderPlantName(plant)}
-                </div>
+                {renderPlantName(plant)}
               </h1>
               {plant.common_name && (
                 <p className="text-xl text-gray-600 mt-2">{plant.common_name}</p>
@@ -262,6 +275,15 @@ export default function PlantDetailPage({ params }) {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              {plant.is_admin_plant ? (
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                  Admin Plant
+                </Badge>
+              ) : plant.user_id === authUser?.id ? (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                  My Plant
+                </Badge>
+              ) : null}
               {getCollectionNames(plant).map((name, index) => (
                 <Badge key={index} variant="secondary">
                   {name}

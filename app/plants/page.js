@@ -17,6 +17,8 @@ export default function PlantsPage() {
   const [collections, setCollections] = useState([]);
   const [favorites, setFavorites] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const [globalSightings, setGlobalSightings] = useState({});
+  const [userSightings, setUserSightings] = useState({});
   const { user: authUser } = useAuth();
   const router = useRouter();
 
@@ -28,9 +30,40 @@ export default function PlantsPage() {
     }
   }, [authUser]);
 
+  const fetchGlobalSightings = async (plantIds) => {
+    if (!plantIds.length) return;
+    const { data, error } = await supabase
+      .from('global_sighting_counts')
+      .select('plant_id, sighting_count')
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      data.forEach(row => {
+        counts[row.plant_id] = row.sighting_count;
+      });
+      setGlobalSightings(counts);
+    }
+  };
+
+  const fetchUserSightings = async (plantIds) => {
+    if (!plantIds.length || !authUser) return;
+    const { data, error } = await supabase
+      .from('sightings')
+      .select('plant_id')
+      .eq('user_id', authUser.id)
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      data.forEach(row => {
+        counts[row.plant_id] = (counts[row.plant_id] || 0) + 1;
+      });
+      setUserSightings(counts);
+    }
+  };
+
   const fetchPlants = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('plants')
         .select(`
           *,
@@ -43,11 +76,27 @@ export default function PlantsPage() {
             collection_id
           )
         `)
-        .eq('is_published', true)
         .order('scientific_name');
+
+      if (authUser) {
+        query = query.or(`is_published.eq.true,user_id.eq.${authUser.id}`);
+      } else {
+        query = query.eq('is_published', true);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setPlants(data || []);
+      
+      if (data && data.length) {
+        const plantIds = data.map(p => p.id);
+        fetchGlobalSightings(plantIds);
+        if (authUser) {
+          fetchUserSightings(plantIds);
+        }
+      }
+      
       setLoading(false);
     } catch (err) {
       console.error('Error fetching plants:', err);
@@ -145,12 +194,24 @@ export default function PlantsPage() {
             <Card 
               key={plant.id}
               className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer"
-              onClick={() => router.push(`/plants/${plant.slug}`)}
+              onClick={() => {
+                console.log('Plant data:', {
+                  id: plant.id,
+                  slug: plant.slug,
+                  is_admin_plant: plant.is_admin_plant,
+                  user_id: plant.user_id
+                });
+                if (plant.slug) {
+                  router.push(`/plants/${plant.slug}`);
+                } else {
+                  console.error('No slug found for plant:', plant);
+                }
+              }}
             >
               <div className="aspect-square relative">
-                {plant.plant_images?.[0] ? (
+                {plant.plant_images?.length > 0 ? (
                   <img
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-images/${plant.plant_images[0].path}`}
+                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path.startsWith(authUser?.id) ? 'user-plant-images' : 'plant-images'}/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path}`}
                     alt={renderPlantName(plant)}
                     className="w-full h-full object-cover"
                   />
@@ -174,18 +235,37 @@ export default function PlantsPage() {
                 </Button>
               </div>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  {renderPlantName(plant)}
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {renderPlantName(plant)}
+                  </h3>
                 </div>
                 {plant.common_name && (
                   <p className="text-sm text-gray-600 mb-3">{plant.common_name}</p>
                 )}
                 <div className="flex flex-wrap gap-2">
+                  {plant.is_admin_plant ? (
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                      Admin Plant
+                    </Badge>
+                  ) : plant.user_id === authUser?.id ? (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                      My Plant
+                    </Badge>
+                  ) : null}
                   {getCollectionNames(plant).map((name, index) => (
                     <Badge key={index} variant="secondary">
                       {name}
                     </Badge>
                   ))}
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                    Global sightings: {globalSightings[plant.id] || 0}
+                  </Badge>
+                  {authUser && (
+                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                      My sightings: {userSightings[plant.id] || 0}
+                    </Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
