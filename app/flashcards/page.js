@@ -22,7 +22,8 @@ import {
   RefreshCw,
   ExternalLink,
   Leaf,
-  CircleDashed
+  CircleDashed,
+  Info,
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
@@ -45,6 +46,18 @@ const debounce = (func, wait) => {
     timeout = setTimeout(later, wait);
   };
 };
+
+// Tooltip component (simple, inline for now)
+function Tooltip({ text, children }) {
+  return (
+    <span className="relative group">
+      {children}
+      <span className="absolute left-0 top-full mt-2 z-10 max-w-[14rem] w-max whitespace-normal rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none shadow-lg border border-gray-800">
+        {text}
+      </span>
+    </span>
+  );
+}
 
 export default function PlantFlashcardApp() {
   const [plants, setPlants] = useState([]);
@@ -872,7 +885,11 @@ export default function PlantFlashcardApp() {
                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Main Filters Group */}
                   <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
-                    <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2"><Leaf className="w-4 h-4 text-green-600" /> Main Filters</div>
+                    <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                      <Leaf className="w-4 h-4 text-green-600" />
+                      Main Filters
+                      <Tooltip text="Primary ways to filter your study set, including all plants, favorites, testable, and practice-needed."><Info className="w-4 h-4 text-gray-400 cursor-pointer" /></Tooltip>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={() => {
@@ -925,7 +942,11 @@ export default function PlantFlashcardApp() {
                   {/* Sightings Filter Group */}
                   {showAdminSightings && (
                     <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
-                      <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2"><Binoculars className="w-4 h-4 text-gray-600" /> Sightings</div>
+                      <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                        <Binoculars className="w-4 h-4 text-gray-600" />
+                        Sightings
+                        <Tooltip text="Filter by the number of times a plant has been sighted globally or by you."><Info className="w-4 h-4 text-gray-400 cursor-pointer" /></Tooltip>
+                      </div>
                       {/* Global Sightings Buttons */}
                       <div className="mb-2">
                         <div className="font-medium text-gray-600 mb-1">Global Sightings</div>
@@ -1009,7 +1030,11 @@ export default function PlantFlashcardApp() {
                   {/* Collections Filter Group */}
                   {showAdminCollections && (
                     <div className="space-y-4 border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
-                      <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2"><Filter className="w-4 h-4 text-gray-600" /> Collections</div>
+                      <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-gray-600" />
+                        Collections
+                        <Tooltip text="Curated groups of plants, either by admins or yourself."><Info className="w-4 h-4 text-gray-400 cursor-pointer" /></Tooltip>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {collections && collections.length > 0 ? (
                           collections
@@ -1157,11 +1182,6 @@ export default function PlantFlashcardApp() {
                         <p className={`text-gray-600 mt-4 max-w-md mx-auto ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
                           {currentPlant.description}
                         </p>
-                      )}
-                      {showAdminSightings && (
-                        <Badge className="ml-2 bg-green-600 text-white font-semibold">
-                          Global sightings: {currentPlant.global_sighting_counts?.sighting_count || 0}
-                        </Badge>
                       )}
                     </div>
                   </div>
