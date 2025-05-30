@@ -7,6 +7,14 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata = {
   title: 'Plant Flashcards',
   description: 'Learn about plants with interactive flashcards',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' }
+    ],
+    apple: [
+      { url: '/icon.svg', type: 'image/svg+xml' }
+    ]
+  },
 };
 
 export default function RootLayout({ children }) {
