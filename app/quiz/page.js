@@ -247,90 +247,84 @@ function QuizHubContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Filter Panel */}
-          <div className="lg:col-span-1">
-            <PlantFilterPanel
-              user={user}
-              plants={plants}
-              filteredPlants={filteredPlants}
-              collections={collections}
-              filters={filters}
-              setFilters={setFilters}
-              showAdminSightings={showAdminSightings}
-              showAdminCollections={showAdminCollections}
-              showAdminPlants={showAdminPlants}
-              getFavoritesCount={getFavoritesCount}
-              getCollectionPlantCount={getCollectionPlantCount}
-              needPracticeCount={Object.values(answerStats).filter(stats => 
-                stats.total === 0 || stats.correct / stats.total < 0.8
-              ).length}
-            />
-          </div>
+        <div className="mb-8">
+          <PlantFilterPanel
+            user={user}
+            plants={plants}
+            filteredPlants={filteredPlants}
+            collections={collections}
+            filters={filters}
+            setFilters={setFilters}
+            showAdminSightings={showAdminSightings}
+            showAdminCollections={showAdminCollections}
+            showAdminPlants={showAdminPlants}
+            getFavoritesCount={getFavoritesCount}
+            getCollectionPlantCount={getCollectionPlantCount}
+            needPracticeCount={Object.values(answerStats).filter(stats => 
+              stats.total === 0 || stats.correct / stats.total < 0.8
+            ).length}
+          />
+        </div>
 
-          {/* Quiz Options */}
-          <div className="lg:col-span-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Multiple Choice Quiz */}
-              <Card className="hover:shadow-lg transition-shadow duration-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <ListChecks className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Multiple Choice</h3>
-                      <p className="text-sm text-gray-500">Test your knowledge with multiple choice questions</p>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock className="w-4 h-4" />
-                      <span>10 questions per quiz</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Award className="w-4 h-4" />
-                      <span>Score based on accuracy</span>
-                    </div>
-                    <Button 
-                      className="w-full"
-                      onClick={() => router.push(`/quiz/multiple-choice?${new URLSearchParams(filters).toString()}`)}
-                    >
-                      Start Quiz
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Multiple Choice Quiz */}
+          <Card className="hover:shadow-lg transition-shadow duration-200">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <ListChecks className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Multiple Choice</h3>
+                  <p className="text-sm text-gray-500">Test your knowledge with multiple choice questions</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Clock className="w-4 h-4" />
+                  <span>10 questions per quiz</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Award className="w-4 h-4" />
+                  <span>Score based on accuracy</span>
+                </div>
+                <Button 
+                  className="w-full"
+                  onClick={() => router.push(`/quiz/multiple-choice?${new URLSearchParams(filters).toString()}`)}
+                >
+                  Start Quiz
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Coming Soon: Image Recognition Quiz */}
-              <Card className="hover:shadow-lg transition-shadow duration-200 opacity-75">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-purple-100 rounded-full">
-                      <Brain className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Image Recognition</h3>
-                      <p className="text-sm text-gray-500">Identify plants from images</p>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock className="w-4 h-4" />
-                      <span>Coming soon</span>
-                    </div>
-                    <Button 
-                      className="w-full"
-                      variant="outline"
-                      disabled
-                    >
-                      Coming Soon
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          {/* Coming Soon: Image Recognition Quiz */}
+          <Card className="hover:shadow-lg transition-shadow duration-200 opacity-75">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <Brain className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Image Recognition</h3>
+                  <p className="text-sm text-gray-500">Identify plants from images</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Clock className="w-4 h-4" />
+                  <span>Coming soon</span>
+                </div>
+                <Button 
+                  className="w-full"
+                  variant="outline"
+                  disabled
+                >
+                  Coming Soon
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
       <Footer />

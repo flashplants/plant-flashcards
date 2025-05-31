@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GalleryHorizontalEnd, Leaf, Settings } from 'lucide-react';
+import { GalleryHorizontalEnd, Leaf, Settings, Award, Home, Book, Brain } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Footer() {
@@ -35,6 +35,22 @@ export default function Footer() {
             <GalleryHorizontalEnd className="w-5 h-5" />
             <span className="text-xs font-medium">Flashcards</span>
           </Link>
+          <Link
+            href="/quiz"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50"
+          >
+            <Brain className="w-5 h-5" />
+            <span className="text-xs font-medium">Quiz Hub</span>
+          </Link>
+          {user && (
+            <Link
+              href="/profile"
+              className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-green-600 hover:bg-green-50"
+            >
+              <Award className="w-5 h-5" />
+              <span className="text-xs font-medium">My Profile</span>
+            </Link>
+          )}
         </div>
       </nav>
     </footer>

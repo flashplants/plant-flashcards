@@ -10,8 +10,13 @@ export const defaultFilters = {
   isFiltersExpanded: true,
 };
 
-export function applyFilters(plants, filters, { favorites, answered, userSightings, globalSightings } = {}) {
+export function applyFilters(plants, filters, { favorites, answered, userSightings, globalSightings, showAdminPlants, user } = {}) {
   let result = [...plants];
+  
+  // Filter out admin plants if showAdminPlants is false
+  if (showAdminPlants === false && user) {
+    result = result.filter(plant => !plant.is_admin_plant || plant.user_id === user.id);
+  }
   
   // Collection filter
   if (filters.selectedCollection) {

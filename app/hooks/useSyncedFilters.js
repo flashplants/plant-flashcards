@@ -13,7 +13,10 @@ export function useSyncedFilters() {
   useEffect(() => {
     const search = searchParams.toString();
     const urlFilters = parseFiltersFromUrl(search);
-    setFilters(urlFilters);
+    setFilters(prev => ({
+      ...urlFilters,
+      isFiltersExpanded: prev.isFiltersExpanded // Preserve the expanded state
+    }));
   }, [searchParams]);
 
   // Update URL when filters change
@@ -34,7 +37,10 @@ export function useSyncedFilters() {
   useEffect(() => {
     const handlePopState = () => {
       const urlFilters = parseFiltersFromUrl(window.location.search);
-      setFilters(urlFilters);
+      setFilters(prev => ({
+        ...urlFilters,
+        isFiltersExpanded: prev.isFiltersExpanded // Preserve the expanded state
+      }));
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -52,8 +58,8 @@ export function useSyncedFilters() {
         return value === defaultFilters[key];
       });
 
-      // If all filters are default, return defaultFilters
-      return isAllDefault ? defaultFilters : newFilters;
+      // If all filters are default, return defaultFilters but preserve isFiltersExpanded
+      return isAllDefault ? { ...defaultFilters, isFiltersExpanded: newFilters.isFiltersExpanded } : newFilters;
     });
   };
 

@@ -30,6 +30,7 @@ export default function PlantFilterPanel({
   getFavoritesCount,
   getCollectionPlantCount,
   filteredPlants,
+  needPracticeCount,
 }) {
   return (
     <div className="mb-6 bg-white rounded-lg shadow-md overflow-hidden">
@@ -147,6 +148,7 @@ export default function PlantFilterPanel({
                   >
                     <CircleDashed className="w-4 h-4" />
                     Need Practice
+                    <Badge className="ml-2 bg-yellow-600 text-white font-semibold">{needPracticeCount}</Badge>
                   </Button>
                 </>
               )}
