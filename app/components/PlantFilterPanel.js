@@ -53,7 +53,7 @@ export default function PlantFilterPanel({
         </svg>
       </button>
       <div 
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${filters.isFiltersExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'}`}
+        className={`transition-all duration-300 ease-in-out ${filters.isFiltersExpanded ? 'opacity-100' : 'opacity-0'} ${filters.isFiltersExpanded ? 'max-h-none md:max-h-[700px]' : 'max-h-0'} ${filters.isFiltersExpanded ? '' : 'overflow-hidden'}`}
       >
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Main Filters Group */}
