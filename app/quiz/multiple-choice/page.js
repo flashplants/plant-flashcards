@@ -502,4 +502,17 @@ function MultipleChoiceQuizContent() {
   );
 }
 
-export default MultipleChoiceQuizContent;
+export default function MultipleChoiceQuizPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+        </div>
+      </div>
+    }>
+      <MultipleChoiceQuizContent />
+    </Suspense>
+  );
+}
