@@ -26,6 +26,7 @@ import {
   Leaf,
   CircleDashed,
   Info,
+  Brain,
 } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
@@ -60,8 +61,8 @@ function FlashcardsContent() {
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [globalSightings, setGlobalSightings] = useState([]);
-  const [userSightings, setUserSightings] = useState([]);
+  const [globalSightings, setGlobalSightings] = useState({});
+  const [userSightings, setUserSightings] = useState({});
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -86,7 +87,7 @@ function FlashcardsContent() {
   const [studySet, setStudySet] = useState([]);
   const [needPracticeCount, setNeedPracticeCount] = useState(0);
 
-  const [filters, setFilters] = useSyncedFilters();
+  const [filters, setFilters] = useSyncedFilters(searchParams);
 
   // Update need practice count when user changes
   useEffect(() => {
@@ -102,12 +103,12 @@ function FlashcardsContent() {
     return applyFilters(plants, filters, { 
       favorites, 
       answered: answerStats,
-      globalSightings,
       userSightings,
+      globalSightings,
       showAdminPlants,
       user
     });
-  }, [plants, filters, favorites, answerStats, globalSightings, userSightings, showAdminPlants, user]);
+  }, [plants, filters, favorites, answerStats, userSightings, globalSightings, showAdminPlants, user]);
 
   // Update study set when filtered plants change
   useEffect(() => {
@@ -163,39 +164,52 @@ function FlashcardsContent() {
 
   // Fetch collections regardless of authentication status
   useEffect(() => {
-    console.log('=== COLLECTIONS FETCH START ===');
-    const fetchCollections = async () => {
-      try {
-        console.log('Attempting to fetch collections...');
-        const { data: collData, error } = await supabase
-          .from('collections_with_count')
-          .select('*')
-          .eq('is_published', true)
-          .order('name');
-        
-        console.log('=== COLLECTIONS DATA ===');
-        console.log('Data:', collData);
-        console.log('Error:', error);
-        console.log('=== END COLLECTIONS DATA ===');
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('show_admin_collections')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data && typeof data.show_admin_collections === 'boolean') {
+            setShowAdminCollections(data.show_admin_collections);
+          }
+        });
+    }
+  }, [user]);
 
-        if (error) {
-          console.error('Error fetching collections:', error);
-          return;
-        }
+  useEffect(() => {
+    const fetchData = async () => {
+      console.log('=== COLLECTIONS FETCH START ===');
+      console.log('User:', user?.id);
+      console.log('Show admin collections:', showAdminCollections);
+      
+      let query = supabase
+        .from('collections')
+        .select('id, name, is_published, is_admin_collection, user_id')
+        .eq('is_published', true);
 
-        if (collData) {
-          console.log('Setting collections:', collData);
-          setCollections(collData);
-        } else {
-          console.log('No collections data returned');
-        }
-      } catch (error) {
-        console.error('Error in fetchCollections:', error);
+      // If user is logged in, show their collections and admin collections
+      if (user) {
+        query = query.or(`user_id.eq.${user.id},is_admin_collection.eq.true`);
+      } else {
+        query = query.eq('is_admin_collection', true);
       }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      console.log('Collections fetched:', data?.length);
+      setCollections(data || []);
     };
 
-    fetchCollections();
-  }, []);
+    fetchPlants();
+    if (user) {
+      fetchAnswerStats();
+      fetchFavorites();
+      fetchData();
+    }
+  }, [user, showAdminCollections]);
 
   // Fetch plants only once on mount
   useEffect(() => {
@@ -207,6 +221,7 @@ function FlashcardsContent() {
     if (user) {
       fetchUserData();
       fetchAnswerStats();
+      fetchFavorites();
     }
   }, [user]);
 
@@ -228,11 +243,8 @@ function FlashcardsContent() {
   }, [user]);
 
   const fetchPlants = async () => {
-    setLoading(true);
-    setError(null);
-    
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('plants')
         .select(`
           *,
@@ -241,64 +253,59 @@ function FlashcardsContent() {
             path,
             is_primary
           ),
-          global_sighting_counts (
-            sighting_count
-          ),
           collection_plants (
             collection_id
           )
         `)
-        .eq('is_published', true)
-        .order('scientific_name');
-
-      const { data, error } = await query;
+        .eq('is_published', true);
 
       if (error) throw error;
-      
-      // Add sightings count to each plant
-      const plantsWithSightings = (data || []).map(plant => ({
-        ...plant,
-        sightings_count: plant.global_sighting_counts?.[0]?.sighting_count || 0
-      }));
-      
-      setPlants(shuffleArray(plantsWithSightings));
+      setPlants(data || []);
 
-      // Fetch global sightings
-      const plantIds = plantsWithSightings.map(p => p.id);
-      const { data: globalData } = await supabase
-        .from('global_sighting_counts')
-        .select('plant_id, sighting_count')
-        .in('plant_id', plantIds);
-      
-      if (globalData) {
-        const counts = {};
-        globalData.forEach(row => {
-          counts[row.plant_id] = row.sighting_count;
-        });
-        setGlobalSightings(counts);
-      }
-
-      // Fetch user sightings if authenticated
-      if (user) {
-        const { data: userData } = await supabase
-          .from('sightings')
-          .select('plant_id')
-          .eq('user_id', user.id)
-          .in('plant_id', plantIds);
-        
-        if (userData) {
-          const counts = {};
-          userData.forEach(row => {
-            counts[row.plant_id] = (counts[row.plant_id] || 0) + 1;
-          });
-          setUserSightings(counts);
+      // Fetch sightings for all plants
+      if (data && data.length) {
+        const allPlantIds = data.map(p => p.id);
+        fetchGlobalSightings(allPlantIds);
+        if (user) {
+          fetchUserSightings(allPlantIds);
         }
       }
-    } catch (err) {
-      console.error('Error fetching plants:', err);
-      setError(err.message);
-    } finally {
+
       setLoading(false);
+    } catch (error) {
+      console.error('Error fetching plants:', error);
+      setLoading(false);
+    }
+  };
+
+  const fetchGlobalSightings = async (plantIds) => {
+    if (!plantIds.length) return;
+    const { data, error } = await supabase
+      .from('global_sighting_counts')
+      .select('plant_id, sighting_count')
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      data.forEach(row => {
+        counts[row.plant_id] = row.sighting_count;
+      });
+      setGlobalSightings(counts);
+    }
+  };
+
+  const fetchUserSightings = async (plantIds) => {
+    if (!plantIds.length || !user) return;
+    const { data, error } = await supabase
+      .from('sightings')
+      .select('plant_id')
+      .eq('user_id', user.id)
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      data.forEach(row => {
+        counts[row.plant_id] = (counts[row.plant_id] || 0) + 1;
+      });
+      setUserSightings(counts);
     }
   };
 
@@ -512,7 +519,17 @@ function FlashcardsContent() {
     if (minSightings === 'all') return plants.length;
     const minCount = parseInt(minSightings);
     return plants.filter(plant => {
-      const sightingsCount = plant.global_sighting_counts?.[0]?.sighting_count || 0;
+      const sightingsCount = globalSightings[plant.id] || 0;
+      return sightingsCount >= minCount;
+    }).length;
+  };
+
+  // Add a function to get the count of plants for each my sightings filter
+  const getMySightingsCount = (minSightings) => {
+    if (minSightings === 'all') return plants.length;
+    const minCount = parseInt(minSightings);
+    return plants.filter(plant => {
+      const sightingsCount = userSightings[plant.id] || 0;
       return sightingsCount >= minCount;
     }).length;
   };
@@ -559,7 +576,6 @@ function FlashcardsContent() {
 
   // Helper functions for badge counts
   const getFavoritesCount = () => filteredPlants.filter(p => favorites.has(p.id)).length;
-  const getMySightingsCount = () => filteredPlants.filter(p => p.sightings_count > 0).length;
   const getTestableCount = () => filteredPlants.filter(p => p.is_testable).length;
   const getNeedPracticeCount = async () => {
     if (!user) return 0;
@@ -603,8 +619,9 @@ function FlashcardsContent() {
 
   // Helper to get the correct plant count for a collection
   const getCollectionPlantCount = (col) => {
-    if (typeof col.published_plant_count === 'number') return col.published_plant_count;
-    return 0;
+    return filteredPlants.filter(plant => 
+      plant.collection_plants?.some(cp => cp.collection_id === col.id)
+    ).length;
   };
 
   const handleViewPlants = () => {
@@ -637,6 +654,23 @@ function FlashcardsContent() {
       setAnswerStats(stats);
     } catch (error) {
       console.error('Error fetching answer stats:', error);
+    }
+  };
+
+  const fetchFavorites = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: favData } = await supabase
+        .from('favorites')
+        .select('plant_id')
+        .eq('user_id', user.id);
+      
+      if (favData) {
+        setFavorites(new Set(favData.map(f => f.plant_id)));
+      }
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
     }
   };
 
@@ -715,29 +749,39 @@ function FlashcardsContent() {
                     <h1 className="text-3xl font-bold text-gray-900">Flashcards</h1>
                     <p className="mt-2 text-gray-600">Test your plant knowledge</p>
                   </div>
-                  <Button
-                    onClick={handleViewPlants}
-                    className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
-                  >
-                    <Leaf className="h-4 w-4" />
-                    <span className="whitespace-nowrap">View {filteredPlants.length} Plants in Database</span>
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      onClick={handleViewPlants}
+                      className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
+                    >
+                      <Leaf className="h-4 w-4" />
+                      <span className="whitespace-nowrap">View {filteredPlants.length} Plants in Database</span>
+                    </Button>
+                    <Button
+                      onClick={() => router.push(`/quiz?${searchParams.toString()}`)}
+                      className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
+                    >
+                      <Brain className="h-4 w-4" />
+                      <span>Quiz me on these {filteredPlants.length} plants</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
               <PlantFilterPanel
-                user={user}
-                plants={plants}
-                collections={collections}
                 filters={filters}
                 setFilters={setFilters}
-                showAdminSightings={showAdminSightings}
-                showAdminCollections={showAdminCollections}
-                showAdminPlants={showAdminPlants}
-                getFavoritesCount={getFavoritesCount}
-                getCollectionPlantCount={getCollectionPlantCount}
-                filteredPlants={filteredPlants}
+                plants={plants}
+                answerStats={answerStats}
                 needPracticeCount={needPracticeCount}
+                user={user}
+                filteredPlants={filteredPlants}
+                getFavoritesCount={getFavoritesCount}
+                collections={collections}
+                getCollectionPlantCount={getCollectionPlantCount}
+                showAdminCollections={showAdminCollections}
+                showAdminSightings={showAdminSightings}
+                showAdminPlants={showAdminPlants}
               />
             </>
           )}

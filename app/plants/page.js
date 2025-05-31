@@ -8,7 +8,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
-import { Star, Leaf, GalleryHorizontalEnd } from 'lucide-react';
+import { Star, Leaf, GalleryHorizontalEnd, Brain } from 'lucide-react';
 import { Button } from "../../components/ui/button";
 import { buildFullPlantName, renderPlantName } from '../utils/plantNameUtils';
 import PlantFilterPanel from '../components/PlantFilterPanel';
@@ -372,13 +372,22 @@ function PlantsContent() {
               <h1 className="text-3xl font-bold text-gray-900">Plants</h1>
               <p className="mt-2 text-gray-600">Browse our collection of plants</p>
             </div>
-            <Button
-              onClick={handleStudyPlants}
-              className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
-            >
-              <GalleryHorizontalEnd className="h-4 w-4" />
-              <span>Study {filteredAllPlants.length} Plants with Flashcards</span>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                onClick={handleStudyPlants}
+                className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
+              >
+                <GalleryHorizontalEnd className="h-4 w-4" />
+                <span>Study {filteredAllPlants.length} Plants with Flashcards</span>
+              </Button>
+              <Button
+                onClick={() => router.push(`/quiz?${searchParams.toString()}`)}
+                className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
+              >
+                <Brain className="h-4 w-4" />
+                <span>Quiz me on these {filteredAllPlants.length} plants</span>
+              </Button>
+            </div>
           </div>
         </div>
 
