@@ -8,7 +8,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
-import { Star, Leaf } from 'lucide-react';
+import { Star, Leaf, GalleryHorizontalEnd } from 'lucide-react';
 import { Button } from "../../components/ui/button";
 import { buildFullPlantName, renderPlantName } from '../utils/plantNameUtils';
 import PlantFilterPanel from '../components/PlantFilterPanel';
@@ -47,9 +47,11 @@ function PlantsContent() {
       favorites,
       answered: null,
       userSightings,
-      globalSightings
+      globalSightings,
+      showAdminPlants,
+      user
     });
-  }, [allPlants, filters, favorites, userSightings, globalSightings]);
+  }, [allPlants, filters, favorites, userSightings, globalSightings, showAdminPlants, user]);
 
   // Get paginated subset of filtered plants
   const paginatedPlants = useMemo(() => {
@@ -235,15 +237,50 @@ function PlantsContent() {
 
   const fetchCollections = async () => {
     try {
-      const { data, error } = await supabase
+      console.log('=== COLLECTIONS FETCH START ===');
+      console.log('User:', user?.id);
+      console.log('Show admin collections:', showAdminCollections);
+      
+      let query = supabase
         .from('collections')
-        .select('id, name, is_published')
+        .select('id, name, is_published, is_admin_collection, user_id')
         .eq('is_published', true);
 
-      if (error) throw error;
-      setCollections(data || []);
+      // If user is logged in, show their collections and admin collections
+      if (user) {
+        console.log('User is logged in, showing user collections and admin collections');
+        query = query.or(`user_id.eq.${user.id},is_admin_collection.eq.true`);
+      } else {
+        console.log('User is not logged in, showing only admin collections');
+        query = query.eq('is_admin_collection', true);
+      }
+
+      const { data, error } = await query;
+      
+      console.log('=== COLLECTIONS DATA ===');
+      console.log('Raw data:', data);
+      console.log('Error:', error);
+      
+      if (data) {
+        console.log('Collections breakdown:');
+        console.log('Admin collections:', data.filter(c => c.is_admin_collection));
+        console.log('User collections:', data.filter(c => !c.is_admin_collection));
+      }
+      console.log('=== END COLLECTIONS DATA ===');
+
+      if (error) {
+        console.error('Error fetching collections:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Setting collections:', data);
+        setCollections(data);
+      } else {
+        console.log('No collections data returned');
+      }
     } catch (err) {
-      console.error('Error fetching collections:', err);
+      console.error('Error in fetchCollections:', err);
     }
   };
 
@@ -330,17 +367,17 @@ function PlantsContent() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Plants</h1>
               <p className="mt-2 text-gray-600">Browse our collection of plants</p>
             </div>
             <Button
               onClick={handleStudyPlants}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
             >
-              <Leaf className="h-4 w-4" />
-              Study {filteredAllPlants.length} Plants with Flashcards
+              <GalleryHorizontalEnd className="h-4 w-4" />
+              <span>Study {filteredAllPlants.length} Plants with Flashcards</span>
             </Button>
           </div>
         </div>
