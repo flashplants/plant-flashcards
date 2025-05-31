@@ -15,7 +15,6 @@ import PlantFilterPanel from '../components/PlantFilterPanel';
 import { parseFiltersFromUrl, serializeFiltersToUrl } from '../utils/filters';
 import { useSyncedFilters } from '../hooks/useSyncedFilters';
 import { applyFilters } from '../utils/filters';
-import { PlantGrid } from '../components/PlantGrid';
 
 function PlantsContent() {
   const router = useRouter();
