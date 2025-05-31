@@ -68,6 +68,7 @@ function FlashcardsContent() {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
   const [answered, setAnswered] = useState(new Set());
+  const [answerStats, setAnswerStats] = useState({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
@@ -82,18 +83,36 @@ function FlashcardsContent() {
   const [showAdminPlants, setShowAdminPlants] = useState(true);
   const [showAdminCollections, setShowAdminCollections] = useState(true);
   const [showAdminSightings, setShowAdminSightings] = useState(true);
+  const [studySet, setStudySet] = useState([]);
+  const [needPracticeCount, setNeedPracticeCount] = useState(0);
 
   const [filters, setFilters] = useSyncedFilters();
+
+  // Update need practice count when user changes
+  useEffect(() => {
+    if (user) {
+      getNeedPracticeCount().then(setNeedPracticeCount);
+    } else {
+      setNeedPracticeCount(0);
+    }
+  }, [user]);
 
   // Filter plants based on current filters
   const filteredPlants = useMemo(() => {
     return applyFilters(plants, filters, { 
       favorites, 
-      answered,
+      answered: answerStats,
       globalSightings,
-      userSightings
+      userSightings,
+      showAdminPlants,
+      user
     });
-  }, [plants, filters, favorites, answered, globalSightings, userSightings]);
+  }, [plants, filters, favorites, answerStats, globalSightings, userSightings, showAdminPlants, user]);
+
+  // Update study set when filtered plants change
+  useEffect(() => {
+    setStudySet(shuffleArray([...filteredPlants]));
+  }, [filteredPlants]);
 
   // Reset session when filters change
   useEffect(() => {
@@ -187,6 +206,7 @@ function FlashcardsContent() {
   useEffect(() => {
     if (user) {
       fetchUserData();
+      fetchAnswerStats();
     }
   }, [user]);
 
@@ -384,6 +404,19 @@ function FlashcardsContent() {
         [correct ? 'correct' : 'incorrect']: prev[correct ? 'correct' : 'incorrect'] + 1
       }));
 
+      // Update answer statistics
+      const currentPlant = studySet[currentIndex];
+      setAnswerStats(prev => {
+        const plantStats = prev[currentPlant.id] || { correct: 0, total: 0 };
+        return {
+          ...prev,
+          [currentPlant.id]: {
+            correct: plantStats.correct + (correct ? 1 : 0),
+            total: plantStats.total + 1
+          }
+        };
+      });
+
       // Record the answer in the database
       if (user && sessionId) {
         try {
@@ -391,7 +424,7 @@ function FlashcardsContent() {
             .from('flashcard_answers')
             .insert({
               user_id: user.id,
-              plant_id: filteredPlants[currentIndex].id,
+              plant_id: currentPlant.id,
               is_correct: correct,
               session_id: sessionId
             });
@@ -402,11 +435,17 @@ function FlashcardsContent() {
 
       // If this was incorrect, add to incorrect plants
       if (!correct) {
-        setIncorrectPlants(prev => [...prev, filteredPlants[currentIndex]]);
+        setIncorrectPlants(prev => {
+          const exists = prev.some(p => p.id === currentPlant.id);
+          if (!exists) {
+            return [...prev, currentPlant];
+          }
+          return prev;
+        });
       }
 
       // Check if this was the last card
-      if (answered.size + 1 === filteredPlants.length) {
+      if (answered.size + 1 === studySet.length) {
         setTimeout(() => setShowSessionSummary(true), 300);
       } else {
         setTimeout(nextCard, 300);
@@ -415,23 +454,27 @@ function FlashcardsContent() {
   };
 
   const startNewSession = (useIncorrectOnly = false) => {
+    console.log('Starting new session:', { useIncorrectOnly, incorrectPlantsCount: incorrectPlants.length });
     setSessionId(crypto.randomUUID());
     setShowSessionSummary(false);
     setStats({ correct: 0, incorrect: 0 });
     setAnswered(new Set());
-    setIncorrectPlants([]);
     
     if (useIncorrectOnly && incorrectPlants.length > 0) {
-      setFilteredPlants(shuffleArray([...incorrectPlants]));
-      setCurrentIndex(0);
+      console.log('Using incorrect plants:', incorrectPlants);
+      // Use all incorrect plants from the previous session
+      setStudySet(shuffleArray([...incorrectPlants]));
+      setIncorrectPlants([]); // Clear incorrect plants for the new session
     } else {
-      resetSession();
+      console.log('Using all filtered plants');
+      setStudySet(shuffleArray([...filteredPlants]));
+      setIncorrectPlants([]); // Clear incorrect plants for the new session
     }
+    setCurrentIndex(0);
   };
 
   const resetSession = () => {
-    const newPlants = shuffleArray(filteredPlants);
-    setFilteredPlants(newPlants);
+    setStudySet(shuffleArray([...filteredPlants]));
     setCurrentIndex(0);
     setShowAnswer(false);
     setStats({ correct: 0, incorrect: 0 });
@@ -456,16 +499,13 @@ function FlashcardsContent() {
     return plant.image_url || null;
   };
 
-  // Determine which plants to display
-  const displayPlants = filteredPlants.length > 0 ? filteredPlants : plants;
-
   // Update current image URL when navigating between cards
   useEffect(() => {
-    const currentPlant = displayPlants[currentIndex];
+    const currentPlant = studySet[currentIndex];
     if (currentPlant) {
       setCurrentImageUrl(getImageUrl(currentPlant));
     }
-  }, [currentIndex, displayPlants]);
+  }, [currentIndex, studySet]);
 
   // Add a function to get the count of plants for each sightings filter
   const getSightingsCount = (minSightings) => {
@@ -506,7 +546,7 @@ function FlashcardsContent() {
     // Prevent the click from propagating to the card
     e.stopPropagation();
     
-    const currentPlant = displayPlants[currentIndex];
+    const currentPlant = studySet[currentIndex];
     if (currentPlant) {
       setCurrentImageUrl(getImageUrl(currentPlant));
     }
@@ -521,7 +561,44 @@ function FlashcardsContent() {
   const getFavoritesCount = () => filteredPlants.filter(p => favorites.has(p.id)).length;
   const getMySightingsCount = () => filteredPlants.filter(p => p.sightings_count > 0).length;
   const getTestableCount = () => filteredPlants.filter(p => p.is_testable).length;
-  const getNeedPracticeCount = () => filteredPlants.length; // Optionally, you can refine this if you want only those that need practice
+  const getNeedPracticeCount = async () => {
+    if (!user) return 0;
+    
+    try {
+      // Get all plants
+      const { data: plants } = await supabase
+        .from('plants')
+        .select('*')
+        .eq('is_published', true);
+
+      // Get user's flashcard answers
+      const { data: answers } = await supabase
+        .from('flashcard_answers')
+        .select('*')
+        .eq('user_id', user.id);
+
+      // Calculate statistics
+      const plantStats = {};
+      answers?.forEach(answer => {
+        if (!plantStats[answer.plant_id]) {
+          plantStats[answer.plant_id] = { correct: 0, total: 0 };
+        }
+        plantStats[answer.plant_id].total++;
+        if (answer.is_correct) {
+          plantStats[answer.plant_id].correct++;
+        }
+      });
+
+      // Count plants needing practice (same logic as the filter)
+      return plants?.filter(plant => {
+        const stats = plantStats[plant.id] || { correct: 0, total: 0 };
+        return stats.total === 0 || stats.correct / stats.total < 0.8;
+      }).length || 0;
+    } catch (error) {
+      console.error('Error getting need practice count:', error);
+      return 0;
+    }
+  };
   const getAllPlantsCount = () => filteredPlants.length;
 
   // Helper to get the correct plant count for a collection
@@ -533,6 +610,34 @@ function FlashcardsContent() {
   const handleViewPlants = () => {
     const search = searchParams.toString();
     router.push(`/plants${search ? `?${search}` : ''}`, { scroll: false });
+  };
+
+  const fetchAnswerStats = async () => {
+    if (!user) return;
+    
+    try {
+      // Get user's flashcard answers
+      const { data: answers } = await supabase
+        .from('flashcard_answers')
+        .select('*')
+        .eq('user_id', user.id);
+
+      // Calculate statistics
+      const stats = {};
+      answers?.forEach(answer => {
+        if (!stats[answer.plant_id]) {
+          stats[answer.plant_id] = { correct: 0, total: 0 };
+        }
+        stats[answer.plant_id].total++;
+        if (answer.is_correct) {
+          stats[answer.plant_id].correct++;
+        }
+      });
+
+      setAnswerStats(stats);
+    } catch (error) {
+      console.error('Error fetching answer stats:', error);
+    }
   };
 
   if (loading) {
@@ -564,7 +669,7 @@ function FlashcardsContent() {
     );
   }
 
-  if (displayPlants.length === 0) {
+  if (studySet.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
@@ -589,8 +694,8 @@ function FlashcardsContent() {
     );
   }
 
-  const currentPlant = displayPlants[currentIndex];
-  const progress = ((answered.size / displayPlants.length) * 100).toFixed(0);
+  const currentPlant = studySet[currentIndex];
+  const progress = ((answered.size / studySet.length) * 100).toFixed(0);
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-16 ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
@@ -605,25 +710,24 @@ function FlashcardsContent() {
           {!isFullscreen && (
             <>
               <div className="mb-8">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <h1 className="text-3xl font-bold text-gray-900">Flashcards</h1>
                     <p className="mt-2 text-gray-600">Test your plant knowledge</p>
                   </div>
                   <Button
                     onClick={handleViewPlants}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
                   >
                     <Leaf className="h-4 w-4" />
-                    View {filteredPlants.length} Plants in Database
+                    <span className="whitespace-nowrap">View {filteredPlants.length} Plants in Database</span>
                   </Button>
                 </div>
               </div>
 
               <PlantFilterPanel
                 user={user}
-                plants={filteredPlants.length > 0 ? filteredPlants : plants}
-                filteredPlants={filteredPlants}
+                plants={plants}
                 collections={collections}
                 filters={filters}
                 setFilters={setFilters}
@@ -632,6 +736,8 @@ function FlashcardsContent() {
                 showAdminPlants={showAdminPlants}
                 getFavoritesCount={getFavoritesCount}
                 getCollectionPlantCount={getCollectionPlantCount}
+                filteredPlants={filteredPlants}
+                needPracticeCount={needPracticeCount}
               />
             </>
           )}
@@ -640,7 +746,7 @@ function FlashcardsContent() {
           <div className={`bg-white rounded-xl shadow-lg p-8 mb-6 ${isFullscreen ? 'h-[90vh] flex flex-col' : 'min-h-[600px] flex flex-col'}`}>
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm text-gray-500">
-                Card {currentIndex + 1} of {displayPlants.length}
+                Card {currentIndex + 1} of {studySet.length}
               </span>
               <div className="flex items-center gap-2">
                 {user && (
@@ -850,7 +956,7 @@ function FlashcardsContent() {
             <div className="space-y-3 sm:space-y-4">
               <div className="flex justify-between items-center text-sm sm:text-base">
                 <span className="text-gray-600">Total Cards:</span>
-                <span className="font-semibold">{displayPlants.length}</span>
+                <span className="font-semibold">{studySet.length}</span>
               </div>
               
               <div className="flex justify-between items-center text-sm sm:text-base">
@@ -866,7 +972,7 @@ function FlashcardsContent() {
               <div className="flex justify-between items-center text-sm sm:text-base">
                 <span className="text-gray-600">Accuracy:</span>
                 <span className="font-semibold">
-                  {Math.round((stats.correct / displayPlants.length) * 100)}%
+                  {Math.round((stats.correct / studySet.length) * 100)}%
                 </span>
               </div>
             </div>
