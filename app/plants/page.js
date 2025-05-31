@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,17 +15,21 @@ import PlantFilterPanel from '../components/PlantFilterPanel';
 import { parseFiltersFromUrl, serializeFiltersToUrl } from '../utils/filters';
 import { useSyncedFilters } from '../hooks/useSyncedFilters';
 import { applyFilters } from '../utils/filters';
+import { PlantGrid } from '../components/PlantGrid';
 
-export default function PlantsPage() {
-  const [plants, setPlants] = useState([]);
-  const [collections, setCollections] = useState([]);
-  const [favorites, setFavorites] = useState(new Set());
-  const [loading, setLoading] = useState(true);
-  const [globalSightings, setGlobalSightings] = useState({});
-  const [userSightings, setUserSightings] = useState({});
-  const { user: authUser } = useAuth();
+function PlantsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, isAuthenticated } = useAuth();
+  const [plants, setPlants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [globalSightings, setGlobalSightings] = useState({});
+  const [userSightings, setUserSightings] = useState({});
+  const [isFetchingUserData, setIsFetchingUserData] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [favorites, setFavorites] = useState(new Set());
+  const [collections, setCollections] = useState([]);
   const [showAdminPlants, setShowAdminPlants] = useState(true);
   const [showAdminCollections, setShowAdminCollections] = useState(true);
   const [showAdminSightings, setShowAdminSightings] = useState(true);
@@ -48,11 +52,11 @@ export default function PlantsPage() {
   };
 
   useEffect(() => {
-    if (authUser) {
+    if (user) {
       supabase
         .from('profiles')
         .select('show_admin_plants, show_admin_collections, show_admin_sightings')
-        .eq('id', authUser.id)
+        .eq('id', user.id)
         .single()
         .then(({ data }) => {
           if (data) {
@@ -62,15 +66,15 @@ export default function PlantsPage() {
           }
         });
     }
-  }, [authUser]);
+  }, [user]);
 
   useEffect(() => {
     fetchPlants();
     fetchCollections();
-    if (authUser) {
+    if (user) {
       fetchFavorites();
     }
-  }, [authUser, showAdminPlants]);
+  }, [user, showAdminPlants]);
 
   const fetchGlobalSightings = async (plantIds) => {
     if (!plantIds.length) return;
@@ -88,11 +92,11 @@ export default function PlantsPage() {
   };
 
   const fetchUserSightings = async (plantIds) => {
-    if (!plantIds.length || !authUser) return;
+    if (!plantIds.length || !user) return;
     const { data, error } = await supabase
       .from('sightings')
       .select('plant_id')
-      .eq('user_id', authUser.id)
+      .eq('user_id', user.id)
       .in('plant_id', plantIds);
     if (!error && data) {
       const counts = {};
@@ -120,8 +124,8 @@ export default function PlantsPage() {
         `)
         .order('scientific_name');
 
-      if (authUser) {
-        query = query.or(`is_published.eq.true,user_id.eq.${authUser.id}`);
+      if (user) {
+        query = query.or(`is_published.eq.true,user_id.eq.${user.id}`);
       } else {
         query = query.eq('is_published', true);
       }
@@ -130,15 +134,15 @@ export default function PlantsPage() {
 
       if (error) throw error;
       let filtered = data || [];
-      if (authUser && !showAdminPlants) {
-        filtered = filtered.filter(plant => !plant.is_admin_plant || plant.user_id === authUser.id);
+      if (user && !showAdminPlants) {
+        filtered = filtered.filter(plant => !plant.is_admin_plant || plant.user_id === user.id);
       }
       setPlants(filtered);
       
       if (filtered && filtered.length) {
         const plantIds = filtered.map(p => p.id);
         fetchGlobalSightings(plantIds);
-        if (authUser) {
+        if (user) {
           fetchUserSightings(plantIds);
         }
       }
@@ -169,7 +173,7 @@ export default function PlantsPage() {
       const { data, error } = await supabase
         .from('favorites')
         .select('plant_id')
-        .eq('user_id', authUser.id);
+        .eq('user_id', user.id);
 
       if (error) throw error;
       setFavorites(new Set(data.map(f => f.plant_id)));
@@ -179,7 +183,7 @@ export default function PlantsPage() {
   };
 
   const toggleFavorite = async (plant) => {
-    if (!authUser) {
+    if (!user) {
       router.push('/login');
       return;
     }
@@ -191,7 +195,7 @@ export default function PlantsPage() {
         await supabase
           .from('favorites')
           .delete()
-          .eq('user_id', authUser.id)
+          .eq('user_id', user.id)
           .eq('plant_id', plant.id);
         
         setFavorites(prev => {
@@ -202,7 +206,7 @@ export default function PlantsPage() {
       } else {
         await supabase
           .from('favorites')
-          .insert({ user_id: authUser.id, plant_id: plant.id });
+          .insert({ user_id: user.id, plant_id: plant.id });
         
         setFavorites(prev => new Set([...prev, plant.id]));
       }
@@ -253,7 +257,7 @@ export default function PlantsPage() {
         </div>
 
         <PlantFilterPanel
-          user={authUser}
+          user={user}
           plants={filteredPlants}
           collections={collections}
           filters={{ ...filters, isFiltersExpanded: true }}
@@ -324,7 +328,7 @@ export default function PlantsPage() {
                     <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
                       Admin Plant
                     </Badge>
-                  ) : plant.user_id === authUser?.id ? (
+                  ) : plant.user_id === user?.id ? (
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
                       My Plant
                     </Badge>
@@ -339,7 +343,7 @@ export default function PlantsPage() {
                       Global sightings: {globalSightings[plant.id] || 0}
                     </Badge>
                   )}
-                  {authUser && (
+                  {user && (
                     <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
                       My sightings: {userSightings[plant.id] || 0}
                     </Badge>
@@ -352,5 +356,13 @@ export default function PlantsPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function PlantsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PlantsContent />
+    </Suspense>
   );
 } 
