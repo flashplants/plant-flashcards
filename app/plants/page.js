@@ -8,7 +8,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
-import { Star, Leaf, GalleryHorizontalEnd, Brain } from 'lucide-react';
+import { Star, Leaf, GalleryHorizontalEnd, Brain, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { Button } from "../../components/ui/button";
 import { buildFullPlantName, renderPlantName } from '../utils/plantNameUtils';
 import PlantFilterPanel from '../components/PlantFilterPanel';
@@ -586,45 +586,49 @@ function PlantsContent() {
               Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredAllPlants.length)} of {filteredAllPlants.length} plants
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
+          <div className="flex flex-row flex-wrap items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="min-w-[48px]"
+              className="min-w-[40px]"
+              aria-label="First page"
             >
-              First
+              <ChevronsLeft className="w-5 h-5" />
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="min-w-[48px]"
+              className="min-w-[40px]"
+              aria-label="Previous page"
             >
-              Previous
+              <ChevronLeft className="w-5 h-5" />
             </Button>
-            <span className="text-sm text-gray-600 w-full sm:w-auto text-center">
+            <span className="text-sm text-gray-600 w-auto text-center min-w-[80px]">
               Page {currentPage} of {Math.ceil(filteredAllPlants.length / pageSize)}
             </span>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredAllPlants.length / pageSize), p + 1))}
               disabled={currentPage === Math.ceil(filteredAllPlants.length / pageSize)}
-              className="min-w-[48px]"
+              className="min-w-[40px]"
+              aria-label="Next page"
             >
-              Next
+              <ChevronRight className="w-5 h-5" />
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setCurrentPage(Math.ceil(filteredAllPlants.length / pageSize))}
               disabled={currentPage === Math.ceil(filteredAllPlants.length / pageSize)}
-              className="min-w-[48px]"
+              className="min-w-[40px]"
+              aria-label="Last page"
             >
-              Last
+              <ChevronsRight className="w-5 h-5" />
             </Button>
           </div>
         </div>
