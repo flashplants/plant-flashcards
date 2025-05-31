@@ -37,3 +37,7 @@ next-env.d.ts
 
 # docs
 /docs/cursor/rules/plants-schema.md
+
+# Excel files
+*.xlsx
+~$*.xlsx
