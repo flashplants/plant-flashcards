@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
@@ -19,6 +19,7 @@ import { applyFilters } from '../utils/filters';
 function PlantsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +33,10 @@ function PlantsContent() {
   const [showAdminPlants, setShowAdminPlants] = useState(true);
   const [showAdminCollections, setShowAdminCollections] = useState(true);
   const [showAdminSightings, setShowAdminSightings] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [filters, setFilters] = useSyncedFilters();
 
@@ -121,7 +126,29 @@ function PlantsContent() {
         console.log('User profile:', { userId: user.id, isAdmin });
       }
 
-      // Build the query
+      // First, get the total count
+      let countQuery = supabase
+        .from('plants')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_published', true);
+
+      if (user) {
+        if (isAdmin) {
+          countQuery = countQuery.eq('is_admin_plant', true);
+        } else {
+          countQuery = countQuery.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
+        }
+      } else {
+        countQuery = countQuery.eq('is_admin_plant', true);
+      }
+
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
+      
+      setTotalCount(count);
+      setTotalPages(Math.ceil(count / pageSize));
+
+      // Then fetch the paginated data
       let query = supabase
         .from('plants')
         .select(`
@@ -135,22 +162,17 @@ function PlantsContent() {
             collection_id
           )
         `)
-        .eq('is_published', true);
+        .eq('is_published', true)
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
       if (user) {
         if (isAdmin) {
-          // Admins can only see admin plants
           query = query.eq('is_admin_plant', true);
-          console.log('Admin query: only showing admin plants');
         } else {
-          // Regular users can see admin plants and their own plants
           query = query.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
-          console.log('Regular user query: showing admin plants and own plants');
         }
       } else {
-        // Non-logged in users can only see admin plants
         query = query.eq('is_admin_plant', true);
-        console.log('Non-user query: only showing admin plants');
       }
 
       query = query.order('scientific_name');
@@ -263,6 +285,16 @@ function PlantsContent() {
     const search = searchParams.toString();
     router.push(`/flashcards${search ? `?${search}` : ''}`, { scroll: false });
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.set('page', currentPage);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [currentPage]);
+
+  useEffect(() => {
+    fetchPlants();
+  }, [currentPage, pageSize]);
 
   if (loading) {
     return (
@@ -388,6 +420,65 @@ function PlantsContent() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        <div className="mt-8 mb-24 relative z-10 bg-gradient-to-br from-green-50 to-emerald-100 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white"
+              >
+                <option value={12}>12 per page</option>
+                <option value={24}>24 per page</option>
+                <option value={48}>48 per page</option>
+              </select>
+              <span className="text-sm text-gray-600">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} plants
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="bg-white"
+              >
+                First
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="bg-white"
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="bg-white"
+              >
+                Next
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="bg-white"
+              >
+                Last
+              </Button>
+            </div>
+          </div>
         </div>
       </main>
       <Footer />
