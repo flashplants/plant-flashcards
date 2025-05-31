@@ -39,7 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import PlantFilterPanel from '../components/PlantFilterPanel';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { debounce } from 'lodash';
-import { Progress } from "@/components/ui/progress";
+import { Progress } from "../../components/ui/progress";
 
 // Tooltip component (simple, inline for now)
 function Tooltip({ text, children }) {
