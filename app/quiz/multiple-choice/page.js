@@ -20,6 +20,7 @@ function MultipleChoiceQuizContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [filtersReady, setFiltersReady] = useState(false);
   const [plants, setPlants] = useState([]);
   const [filters, setFilters] = useSyncedFilters(searchParams);
   const [answerStats, setAnswerStats] = useState({});
@@ -32,28 +33,64 @@ function MultipleChoiceQuizContent() {
   const [sessionId, setSessionId] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [favorites, setFavorites] = useState(new Set());
+  const [globalSightings, setGlobalSightings] = useState({});
+  const [userSightings, setUserSightings] = useState({});
+
+  // Set filtersReady to true after the first render
+  useEffect(() => {
+    setFiltersReady(true);
+  }, []);
 
   useEffect(() => {
     fetchPlants();
     if (user) {
       fetchAnswerStats();
+      fetchFavorites();
     }
     setSessionId(uuidv4());
   }, [user]);
 
   const fetchPlants = async () => {
     try {
-      const { data, error } = await supabase
-        .from('plants')
-        .select(`
-          *,
-          plant_images (
-            id,
-            path,
-            is_primary
-          )
-        `)
-        .eq('is_published', true);
+      // Get user's admin status first
+      let isAdmin = false;
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+        isAdmin = profile?.is_admin || false;
+      }
+
+      // Build base query conditions
+      const baseConditions = (query) => {
+        query = query.eq('is_published', true);
+        if (user) {
+          // Admins see both admin and their own plants
+          query = query.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
+        } else {
+          query = query.eq('is_admin_plant', true);
+        }
+        return query;
+      };
+
+      const { data, error } = await baseConditions(
+        supabase
+          .from('plants')
+          .select(`
+            *,
+            plant_images (
+              id,
+              path,
+              is_primary
+            ),
+            collection_plants (
+              collection_id
+            )
+          `)
+      );
 
       if (error) throw error;
       setPlants(data || []);
@@ -90,9 +127,62 @@ function MultipleChoiceQuizContent() {
     }
   };
 
+  const fetchFavorites = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('plant_id')
+        .eq('user_id', user.id);
+      if (error) throw error;
+      setFavorites(new Set(data.map(fav => fav.plant_id)));
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
+
+  const fetchGlobalSightings = async (plantIds) => {
+    if (!plantIds.length) return;
+    const { data, error } = await supabase
+      .from('global_sighting_counts')
+      .select('plant_id, sighting_count')
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      data.forEach(row => {
+        counts[row.plant_id] = row.sighting_count;
+      });
+      setGlobalSightings(counts);
+    }
+  };
+
+  const fetchUserSightings = async (plantIds) => {
+    if (!plantIds.length || !user) return;
+    const { data, error } = await supabase
+      .from('sightings')
+      .select('plant_id')
+      .eq('user_id', user.id)
+      .in('plant_id', plantIds);
+    if (!error && data) {
+      const counts = {};
+      data.forEach(row => {
+        counts[row.plant_id] = (counts[row.plant_id] || 0) + 1;
+      });
+      setUserSightings(counts);
+    }
+  };
+
+  // After fetching plants, fetch sightings
+  useEffect(() => {
+    if (plants.length) {
+      const plantIds = plants.map(p => p.id);
+      fetchGlobalSightings(plantIds);
+      if (user) fetchUserSightings(plantIds);
+    }
+  }, [plants, user]);
+
   const filteredPlants = useMemo(() => {
-    return applyFilters(plants, filters, answerStats);
-  }, [plants, filters, answerStats]);
+    return applyFilters(plants, filters, { favorites, answerStats, userSightings, globalSightings, user });
+  }, [plants, filters, favorites, answerStats, userSightings, globalSightings, user]);
 
   useEffect(() => {
     if (filteredPlants.length > 0) {
@@ -155,8 +245,9 @@ function MultipleChoiceQuizContent() {
     setSelectedAnswer(null);
     setShowResult(false);
     setScore(0);
+    // Shuffle the current filteredPlants and pick up to 10 for the new quiz
     const shuffled = [...filteredPlants].sort(() => 0.5 - Math.random());
-    setQuizPlants(shuffled.slice(0, 10));
+    setQuizPlants(shuffled.slice(0, Math.min(10, shuffled.length)));
   };
 
   const getImageUrl = (plant) => {
@@ -205,7 +296,7 @@ function MultipleChoiceQuizContent() {
     };
   }, []);
 
-  if (loading) {
+  if (!filtersReady || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
         <Header />
@@ -342,12 +433,14 @@ function MultipleChoiceQuizContent() {
                       style={{ maxHeight: isFullscreen ? '50vh' : '40vh', maxWidth: '100%', width: 'auto' }}
                     />
                   ) : (
-                    <div className={`flex items-center justify-center bg-gray-100 rounded-lg w-full ${isFullscreen ? 'h-[50vh]' : 'h-[40vh]'}`}> 
+                    <div className={`flex items-center justify-center bg-gray-100 rounded-lg w-full ${isFullscreen ? 'h-[50vh]' : 'h-[40vh]'}`}>
                       <span className="text-gray-400">No image</span>
                     </div>
                   )}
                 </div>
-                <h2 className="font-semibold text-gray-900 mb-6 text-center text-xl sm:text-2xl">What is the scientific name of this plant?</h2>
+                <h2 className="font-semibold text-gray-900 mb-6 text-center text-xl sm:text-2xl">
+                  What is the scientific name of this plant?
+                </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {options.map((plant) => (
                     <Button
@@ -409,17 +502,4 @@ function MultipleChoiceQuizContent() {
   );
 }
 
-export default function MultipleChoiceQuizPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
-        <Header />
-        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-        </div>
-      </div>
-    }>
-      <MultipleChoiceQuizContent />
-    </Suspense>
-  );
-} 
+export default MultipleChoiceQuizContent;
