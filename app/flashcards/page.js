@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import PlantFilterPanel from '../components/PlantFilterPanel';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { debounce } from 'lodash';
+import { Progress } from "../../components/ui/progress";
 
 // Tooltip component (simple, inline for now)
 function Tooltip({ text, children }) {
@@ -969,12 +970,7 @@ function FlashcardsContent() {
                   Reset
                 </button>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                <div 
-                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
+              <Progress value={progress} className="mb-3" />
               <div className="flex justify-center gap-8 text-sm">
                 <div className="flex items-center gap-2">
                   <Check className="w-5 h-5 text-green-600" />
