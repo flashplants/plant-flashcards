@@ -1677,7 +1677,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                     <div className="w-32 h-32 flex-shrink-0">
                       {plant.plant_images?.[0] ? (
                         <img
-                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path.startsWith(user?.id) ? 'user-plant-images' : 'plant-images'}/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path}`}
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.is_admin_plant ? 'plant-images' : 'user-plant-images'}/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path}`}
                           alt={renderPlantName(plant)}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -1900,6 +1900,7 @@ function DashboardContent({ user, authUser, showAuth, setShowAuth }) {
                                 variety={editingPlant.variety}
                                 cultivar={editingPlant.cultivar}
                                 onImagesChange={() => fetchPlants()}
+                                is_admin_plant={editingPlant.is_admin_plant}
                               />
                             </div>
 

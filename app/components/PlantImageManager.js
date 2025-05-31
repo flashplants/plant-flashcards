@@ -67,7 +67,7 @@ function buildFilename({ genus, specific_epithet, infraspecies_rank, variety, cu
     .toLowerCase();
 }
 
-const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infraspecies_rank, variety, cultivar, onImagesChange }) => {
+const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infraspecies_rank, variety, cultivar, onImagesChange, is_admin_plant }) => {
   const { supabase, user } = useAuth();
   const [existingImages, setExistingImages] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
@@ -352,7 +352,7 @@ const PlantImageManager = ({ plantId, plantName, genus, specific_epithet, infras
               <div key={image.id} className="relative group">
                 <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
                   <img
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${image.path.startsWith(user?.id) ? 'user-plant-images' : 'plant-images'}/${image.path}`}
+                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${is_admin_plant ? 'plant-images' : 'user-plant-images'}/${image.path}`}
                     alt="Plant"
                     className="w-full h-full object-cover"
                   />
