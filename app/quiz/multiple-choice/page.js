@@ -251,27 +251,29 @@ function MultipleChoiceQuizContent() {
     return (
       <div className={`min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
         {!isFullscreen && <Header />}
-        <main className={`flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto px-2 sm:px-6 lg:px-8 py-8 w-full ${isFullscreen ? 'h-screen' : 'min-h-[calc(100vh-4rem-4rem)]'}`}>
-          <div className="w-full flex flex-col items-center">
-            <Card className={`w-full max-w-md ${isFullscreen ? 'text-2xl' : ''}`}>
-              <CardContent className={`${isFullscreen ? 'p-12' : 'p-6'} px-2 sm:px-8`}>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">Quiz Complete!</h2>
-                <p className="text-lg text-gray-700 mb-2 text-center">Your score: <span className="font-bold">{score} / {quizPlants.length}</span></p>
-                <p className="text-base text-gray-600 mb-6 text-center">{resultMsg}</p>
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center items-center mt-4 w-full">
-                  <Button className="w-full sm:w-auto" onClick={handleRestart}>
-                    <RotateCw className="w-4 h-4 mr-2" />
-                    Take Another Quiz
-                  </Button>
-                  <Button className="w-full sm:w-auto" variant="outline" onClick={() => router.push('/quiz')}>
-                    Back to Quiz Hub
-                  </Button>
-                  <Button className="w-full sm:w-auto" variant="secondary" onClick={() => router.push(`/plants?${searchParams.toString()}`)}>
-                    View Plants in Database
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+          <div className="max-w-6xl mx-auto w-full">
+            <div className="w-full flex flex-col items-center">
+              <Card className="w-full max-w-4xl mx-auto">
+                <CardContent className={`${isFullscreen ? 'p-12' : 'p-6'} px-2 sm:px-8`}>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">Quiz Complete!</h2>
+                  <p className="text-lg text-gray-700 mb-2 text-center">Your score: <span className="font-bold">{score} / {quizPlants.length}</span></p>
+                  <p className="text-base text-gray-600 mb-6 text-center">{resultMsg}</p>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center items-center mt-4 w-full">
+                    <Button className="w-full sm:w-auto" onClick={handleRestart}>
+                      <RotateCw className="w-4 h-4 mr-2" />
+                      Take Another Quiz
+                    </Button>
+                    <Button className="w-full sm:w-auto" variant="outline" onClick={() => router.push('/quiz')}>
+                      Back to Quiz Hub
+                    </Button>
+                    <Button className="w-full sm:w-auto" variant="secondary" onClick={() => router.push(`/plants?${searchParams.toString()}`)}>
+                      View Plants in Database
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </main>
         {!isFullscreen && <Footer />}
@@ -282,114 +284,123 @@ function MultipleChoiceQuizContent() {
   const currentPlant = quizPlants[currentQuestion];
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
+    <div className={`min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-emerald-100 ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
       {!isFullscreen && <Header />}
-      <main className={`flex-1 flex flex-col items-center justify-center w-full ${isFullscreen ? 'h-screen' : 'min-h-[calc(100vh-4rem-4rem)]'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Multiple Choice Quiz</h1>
-              <p className="mt-2 text-gray-600">Question {currentQuestion + 1} of {quizPlants.length}</p>
+      <main
+        className={
+          isFullscreen
+            ? 'h-screen w-screen flex flex-col overflow-hidden'
+            : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20'
+        }
+        style={
+          isFullscreen
+            ? { minHeight: '100vh' }
+            : { minHeight: 'calc(100vh - 8rem)' }
+        }
+      >
+        <div className="max-w-6xl mx-auto w-full">
+          <div className="mb-8 mt-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Multiple Choice Quiz</h1>
+                <p className="text-base sm:text-lg text-gray-600 mb-4">Question {currentQuestion + 1} of {quizPlants.length}</p>
+              </div>
+              <div className="flex items-center gap-2 mt-2 mb-2 w-full sm:w-auto">
+                <button
+                  onClick={isMobile ? undefined : toggleFullscreen}
+                  disabled={isMobile}
+                  aria-disabled={isMobile}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isMobile 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' 
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-600'
+                  }`}
+                  title={isMobile ? "Fullscreen mode is not available on mobile devices" : "Toggle fullscreen"}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className={`w-5 h-5 ${isMobile ? 'text-gray-400' : ''}`} />
+                  ) : (
+                    <Maximize2 className={`w-5 h-5 ${isMobile ? 'text-gray-400' : ''}`} />
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={isMobile ? undefined : toggleFullscreen}
-                disabled={isMobile}
-                aria-disabled={isMobile}
-                className={`p-2 rounded-lg transition-colors ${
-                  isMobile 
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' 
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-600'
-                }`}
-                title={isMobile ? "Fullscreen mode is not available on mobile devices" : "Toggle fullscreen"}
-              >
-                {isFullscreen ? (
-                  <Minimize2 className={`w-5 h-5 ${isMobile ? 'text-gray-400' : ''}`} />
-                ) : (
-                  <Maximize2 className={`w-5 h-5 ${isMobile ? 'text-gray-400' : ''}`} />
-                )}
-              </button>
+            <div className="mt-2 mb-8 w-full max-w-4xl">
+              <Progress value={(currentQuestion / quizPlants.length) * 100} />
             </div>
           </div>
-        </div>
 
-        <div className={`w-full flex flex-col items-center ${isFullscreen ? 'max-w-5xl' : ''}`}>
-          <Card className={`w-full ${isFullscreen ? 'text-2xl' : ''}`}>
-            <CardContent className={`${isFullscreen ? 'p-12' : 'p-8'}`}>
-              <div className={`flex justify-center mb-8 ${isFullscreen ? 'min-h-[60vh]' : ''}`}>
-                {getImageUrl(currentPlant) ? (
-                  <img
-                    src={getImageUrl(currentPlant)}
-                    alt={renderPlantName(currentPlant)}
-                    className={`${isFullscreen ? 'max-h-[60vh]' : 'max-h-72'} rounded-lg shadow object-contain bg-white w-full`}
-                    style={{ maxWidth: '100%', width: 'auto' }}
-                  />
-                ) : (
-                  <div className={`${isFullscreen ? 'w-[60vh] h-[60vh]' : 'w-72 h-72'} flex items-center justify-center bg-gray-100 rounded-lg`}>
-                    <span className="text-gray-400">No image</span>
+          <div className="w-full flex flex-col items-center">
+            <Card className="w-full max-w-4xl flex-1 flex flex-col justify-center">
+              <CardContent className="flex-1 flex flex-col justify-center p-4 sm:p-8">
+                <div className="flex justify-center mb-6 sm:mb-8" style={{ minHeight: '0' }}>
+                  {getImageUrl(currentPlant) ? (
+                    <img
+                      src={getImageUrl(currentPlant)}
+                      alt={renderPlantName(currentPlant)}
+                      className="rounded-lg shadow object-contain bg-white w-full"
+                      style={{ maxHeight: isFullscreen ? '50vh' : '40vh', maxWidth: '100%', width: 'auto' }}
+                    />
+                  ) : (
+                    <div className={`flex items-center justify-center bg-gray-100 rounded-lg w-full ${isFullscreen ? 'h-[50vh]' : 'h-[40vh]'}`}> 
+                      <span className="text-gray-400">No image</span>
+                    </div>
+                  )}
+                </div>
+                <h2 className="font-semibold text-gray-900 mb-6 text-center text-xl sm:text-2xl">What is the scientific name of this plant?</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {options.map((plant) => (
+                    <Button
+                      key={plant.id}
+                      variant={selectedAnswer === plant.id ? "default" : "outline"}
+                      className={`w-full h-auto py-2 px-4 text-left ${
+                        showResult
+                          ? plant.id === currentPlant.id
+                            ? 'bg-green-100 border-green-500 text-green-900'
+                            : selectedAnswer === plant.id
+                            ? 'bg-red-100 border-red-500 text-red-900'
+                            : ''
+                          : ''
+                      } ${isFullscreen ? 'text-lg' : ''}`}
+                      onClick={() => !showResult && handleAnswer(plant.id)}
+                      disabled={showResult}
+                    >
+                      <div className="flex flex-col items-start gap-2 w-full">
+                        <div className="flex items-center gap-2">
+                          {showResult && plant.id === currentPlant.id && (
+                            <Check className="w-5 h-5 text-green-600" />
+                          )}
+                          {showResult && selectedAnswer === plant.id && plant.id !== currentPlant.id && (
+                            <X className="w-5 h-5 text-red-600" />
+                          )}
+                        </div>
+                        <span className="whitespace-normal break-words text-left block w-full">{renderPlantName(plant)}</span>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+                {showResult && (
+                  <div className="mt-6 flex justify-end">
+                    <Button onClick={() => {
+                      if (currentQuestion < quizPlants.length - 1) {
+                        handleNext();
+                      } else {
+                        setCurrentQuestion(currentQuestion + 1);
+                      }
+                    }}>
+                      {currentQuestion < quizPlants.length - 1 ? (
+                        <>
+                          Next Question
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      ) : (
+                        'Finish Quiz'
+                      )}
+                    </Button>
                   </div>
                 )}
-              </div>
-              <h2 className={`font-semibold text-gray-900 mb-8 text-center ${isFullscreen ? 'text-3xl' : 'text-xl'}`}>
-                What is the scientific name of this plant?
-              </h2>
-
-              <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${isFullscreen ? 'text-xl' : ''}`}>
-                {options.map((plant) => (
-                  <Button
-                    key={plant.id}
-                    variant={selectedAnswer === plant.id ? "default" : "outline"}
-                    className={`w-full h-auto py-4 px-6 text-left ${
-                      showResult
-                        ? plant.id === currentPlant.id
-                          ? 'bg-green-100 border-green-500 text-green-900'
-                          : selectedAnswer === plant.id
-                          ? 'bg-red-100 border-red-500 text-red-900'
-                          : ''
-                        : ''
-                    } ${isFullscreen ? 'min-h-[4.5rem] text-lg' : ''}`}
-                    onClick={() => !showResult && handleAnswer(plant.id)}
-                    disabled={showResult}
-                  >
-                    <div className="flex flex-col items-start gap-2 w-full">
-                      <div className="flex items-center gap-2">
-                        {showResult && plant.id === currentPlant.id && (
-                          <Check className="w-5 h-5 text-green-600" />
-                        )}
-                        {showResult && selectedAnswer === plant.id && plant.id !== currentPlant.id && (
-                          <X className="w-5 h-5 text-red-600" />
-                        )}
-                      </div>
-                      <span className="whitespace-normal break-words text-left block w-full">{renderPlantName(plant)}</span>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-
-              {showResult && (
-                <div className="mt-6 flex justify-end">
-                  <Button onClick={() => {
-                    if (currentQuestion < quizPlants.length - 1) {
-                      handleNext();
-                    } else {
-                      setCurrentQuestion(currentQuestion + 1);
-                    }
-                  }}>
-                    {currentQuestion < quizPlants.length - 1 ? (
-                      <>
-                        Next Question
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </>
-                    ) : (
-                      'Finish Quiz'
-                    )}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <div className="mt-8 mb-24 w-full">
-            <Progress value={(currentQuestion / quizPlants.length) * 100} />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

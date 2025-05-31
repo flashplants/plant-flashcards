@@ -245,7 +245,33 @@ function FlashcardsContent() {
 
   const fetchPlants = async () => {
     try {
-      const { data, error } = await supabase
+      // Get user's admin status first
+      let isAdmin = false;
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+        isAdmin = profile?.is_admin || false;
+      }
+
+      // Build base query conditions
+      const baseConditions = (query) => {
+        query = query.eq('is_published', true);
+        if (user) {
+          if (isAdmin) {
+            query = query.eq('is_admin_plant', true);
+          } else {
+            query = query.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
+          }
+        } else {
+          query = query.eq('is_admin_plant', true);
+        }
+        return query;
+      };
+
+      let allPlantsQuery = baseConditions(supabase
         .from('plants')
         .select(`
           *,
@@ -258,14 +284,15 @@ function FlashcardsContent() {
             collection_id
           )
         `)
-        .eq('is_published', true);
+        .order('scientific_name'));
 
-      if (error) throw error;
-      setPlants(data || []);
+      const { data: allPlantsData, error: allPlantsError } = await allPlantsQuery;
+      if (allPlantsError) throw allPlantsError;
+      setPlants(allPlantsData || []);
 
       // Fetch sightings for all plants
-      if (data && data.length) {
-        const allPlantIds = data.map(p => p.id);
+      if (allPlantsData && allPlantsData.length) {
+        const allPlantIds = allPlantsData.map(p => p.id);
         fetchGlobalSightings(allPlantIds);
         if (user) {
           fetchUserSightings(allPlantIds);
@@ -741,16 +768,17 @@ function FlashcardsContent() {
           onClose={() => setShowAuth(false)}
         />
 
-        <div className={`max-w-4xl mx-auto ${isFullscreen ? 'w-full max-w-6xl' : ''}`}>
+        <div className={`max-w-6xl mx-auto w-full ${isFullscreen ? 'max-w-6xl' : ''}`}>
           {!isFullscreen && (
             <>
-              <div className="mb-8">
+              {/* Standardized Heading, Subheading, and Action Buttons */}
+              <div className="mb-8 mt-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Flashcards</h1>
-                    <p className="mt-2 text-gray-600">Test your plant knowledge</p>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Flashcards</h1>
+                    <p className="text-base sm:text-lg text-gray-600 mb-4">Test your plant knowledge</p>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2 mt-2 mb-2 w-full sm:w-auto">
                     <Button
                       onClick={handleViewPlants}
                       className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
@@ -788,7 +816,7 @@ function FlashcardsContent() {
           )}
 
           {/* Flashcard */}
-          <div className={`bg-white rounded-xl shadow-lg p-8 mb-6 ${isFullscreen ? 'h-[90vh] flex flex-col' : 'min-h-[600px] flex flex-col'}`}>
+          <div className={`bg-white rounded-xl shadow-lg p-8 mb-6 max-w-4xl mx-auto ${isFullscreen ? 'h-[90vh] flex flex-col' : 'min-h-[600px] flex flex-col'}`}>
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm text-gray-500">
                 Card {currentIndex + 1} of {studySet.length}
