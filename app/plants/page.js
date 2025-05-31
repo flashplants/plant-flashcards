@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
@@ -11,6 +11,10 @@ import { Badge } from "../../components/ui/badge";
 import { Star, Leaf } from 'lucide-react';
 import { Button } from "../../components/ui/button";
 import { buildFullPlantName, renderPlantName } from '../utils/plantNameUtils';
+import PlantFilterPanel from '../components/PlantFilterPanel';
+import { parseFiltersFromUrl, serializeFiltersToUrl } from '../utils/filters';
+import { useSyncedFilters } from '../hooks/useSyncedFilters';
+import { applyFilters } from '../utils/filters';
 
 export default function PlantsPage() {
   const [plants, setPlants] = useState([]);
@@ -21,9 +25,27 @@ export default function PlantsPage() {
   const [userSightings, setUserSightings] = useState({});
   const { user: authUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showAdminPlants, setShowAdminPlants] = useState(true);
   const [showAdminCollections, setShowAdminCollections] = useState(true);
   const [showAdminSightings, setShowAdminSightings] = useState(true);
+
+  const [filters, setFilters] = useSyncedFilters();
+
+  // Filtering logic
+  const filteredPlants = useMemo(() => {
+    return applyFilters(plants, filters, { 
+      favorites,
+      answered: null,
+      userSightings,
+      globalSightings
+    });
+  }, [plants, filters, favorites, userSightings, globalSightings]);
+
+  const getFavoritesCount = () => plants.filter(p => favorites.has(p.id)).length;
+  const getCollectionPlantCount = (col) => {
+    return plants.filter(plant => plant.collection_plants?.some(cp => cp.collection_id === col.id)).length;
+  };
 
   useEffect(() => {
     if (authUser) {
@@ -197,6 +219,11 @@ export default function PlantsPage() {
       .map(c => c.name);
   };
 
+  const handleStudyPlants = () => {
+    const search = searchParams.toString();
+    router.push(`/flashcards${search ? `?${search}` : ''}`, { scroll: false });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -210,12 +237,36 @@ export default function PlantsPage() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Plants</h1>
-          <p className="mt-2 text-gray-600">Browse our collection of plants</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Plants</h1>
+              <p className="mt-2 text-gray-600">Browse our collection of plants</p>
+            </div>
+            <Button
+              onClick={handleStudyPlants}
+              className="flex items-center gap-2"
+            >
+              <Leaf className="h-4 w-4" />
+              Study {filteredPlants.length} Plants with Flashcards
+            </Button>
+          </div>
         </div>
 
+        <PlantFilterPanel
+          user={authUser}
+          plants={filteredPlants}
+          collections={collections}
+          filters={{ ...filters, isFiltersExpanded: true }}
+          setFilters={setFilters}
+          showAdminSightings={showAdminSightings}
+          showAdminCollections={showAdminCollections}
+          showAdminPlants={showAdminPlants}
+          getFavoritesCount={getFavoritesCount}
+          getCollectionPlantCount={getCollectionPlantCount}
+        />
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {plants.map((plant) => (
+          {filteredPlants.map((plant) => (
             <Card 
               key={plant.id}
               className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer"
@@ -236,7 +287,7 @@ export default function PlantsPage() {
               <div className="aspect-square relative">
                 {plant.plant_images?.length > 0 ? (
                   <img
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path.startsWith(authUser?.id) ? 'user-plant-images' : 'plant-images'}/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path}`}
+                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${plant.is_admin_plant ? 'plant-images' : 'user-plant-images'}/${(plant.plant_images.find(img => img.is_primary) || plant.plant_images[0]).path}`}
                     alt={renderPlantName(plant)}
                     className="w-full h-full object-cover"
                   />
