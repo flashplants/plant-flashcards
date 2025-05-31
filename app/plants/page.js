@@ -378,6 +378,8 @@ function PlantsContent() {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.set('page', currentPage);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    // Scroll to top on page change
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
   useEffect(() => {
@@ -566,53 +568,61 @@ function PlantsContent() {
           ))}
         </div>
 
-        <div className="mt-8 mb-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="mt-8 mb-16 flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
             <select
               value={pageSize}
               onChange={(e) => {
                 setPageSize(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm w-full sm:w-auto"
             >
               <option value={12}>12 per page</option>
               <option value={24}>24 per page</option>
               <option value={48}>48 per page</option>
             </select>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 w-full sm:w-auto text-center">
               Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredAllPlants.length)} of {filteredAllPlants.length} plants
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
+              className="min-w-[48px]"
             >
               First
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
+              className="min-w-[48px]"
             >
               Previous
             </Button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 w-full sm:w-auto text-center">
               Page {currentPage} of {Math.ceil(filteredAllPlants.length / pageSize)}
             </span>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredAllPlants.length / pageSize), p + 1))}
               disabled={currentPage === Math.ceil(filteredAllPlants.length / pageSize)}
+              className="min-w-[48px]"
             >
               Next
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setCurrentPage(Math.ceil(filteredAllPlants.length / pageSize))}
               disabled={currentPage === Math.ceil(filteredAllPlants.length / pageSize)}
+              className="min-w-[48px]"
             >
               Last
             </Button>
