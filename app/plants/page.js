@@ -22,6 +22,7 @@ function PlantsContent() {
   const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
   const [plants, setPlants] = useState([]);
+  const [allPlants, setAllPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [globalSightings, setGlobalSightings] = useState({});
@@ -40,19 +41,26 @@ function PlantsContent() {
 
   const [filters, setFilters] = useSyncedFilters();
 
-  // Filtering logic
-  const filteredPlants = useMemo(() => {
-    return applyFilters(plants, filters, { 
+  // Filtering logic for all plants
+  const filteredAllPlants = useMemo(() => {
+    return applyFilters(allPlants, filters, { 
       favorites,
       answered: null,
       userSightings,
       globalSightings
     });
-  }, [plants, filters, favorites, userSightings, globalSightings]);
+  }, [allPlants, filters, favorites, userSightings, globalSightings]);
 
-  const getFavoritesCount = () => plants.filter(p => favorites.has(p.id)).length;
+  // Get paginated subset of filtered plants
+  const paginatedPlants = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return filteredAllPlants.slice(start, end);
+  }, [filteredAllPlants, currentPage, pageSize]);
+
+  const getFavoritesCount = () => allPlants.filter(p => favorites.has(p.id)).length;
   const getCollectionPlantCount = (col) => {
-    return plants.filter(plant => plant.collection_plants?.some(cp => cp.collection_id === col.id)).length;
+    return allPlants.filter(plant => plant.collection_plants?.some(cp => cp.collection_id === col.id)).length;
   };
 
   useEffect(() => {
@@ -126,21 +134,25 @@ function PlantsContent() {
         console.log('User profile:', { userId: user.id, isAdmin });
       }
 
-      // First, get the total count
-      let countQuery = supabase
-        .from('plants')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_published', true);
-
-      if (user) {
-        if (isAdmin) {
-          countQuery = countQuery.eq('is_admin_plant', true);
+      // Build base query conditions
+      const baseConditions = (query) => {
+        query = query.eq('is_published', true);
+        if (user) {
+          if (isAdmin) {
+            query = query.eq('is_admin_plant', true);
+          } else {
+            query = query.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
+          }
         } else {
-          countQuery = countQuery.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
+          query = query.eq('is_admin_plant', true);
         }
-      } else {
-        countQuery = countQuery.eq('is_admin_plant', true);
-      }
+        return query;
+      };
+
+      // First, get the total count
+      let countQuery = baseConditions(supabase
+        .from('plants')
+        .select('*', { count: 'exact', head: true }));
 
       const { count, error: countError } = await countQuery;
       if (countError) throw countError;
@@ -148,8 +160,8 @@ function PlantsContent() {
       setTotalCount(count);
       setTotalPages(Math.ceil(count / pageSize));
 
-      // Then fetch the paginated data
-      let query = supabase
+      // Fetch all plants for filter stats
+      let allPlantsQuery = baseConditions(supabase
         .from('plants')
         .select(`
           *,
@@ -162,22 +174,39 @@ function PlantsContent() {
             collection_id
           )
         `)
-        .eq('is_published', true)
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+        .order('scientific_name'));
 
-      if (user) {
-        if (isAdmin) {
-          query = query.eq('is_admin_plant', true);
-        } else {
-          query = query.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
+      const { data: allPlantsData, error: allPlantsError } = await allPlantsQuery;
+      if (allPlantsError) throw allPlantsError;
+      setAllPlants(allPlantsData || []);
+
+      // Fetch sightings for all plants
+      if (allPlantsData && allPlantsData.length) {
+        const allPlantIds = allPlantsData.map(p => p.id);
+        fetchGlobalSightings(allPlantIds);
+        if (user) {
+          fetchUserSightings(allPlantIds);
         }
-      } else {
-        query = query.eq('is_admin_plant', true);
       }
 
-      query = query.order('scientific_name');
+      // Then fetch the paginated data
+      let paginatedQuery = baseConditions(supabase
+        .from('plants')
+        .select(`
+          *,
+          plant_images (
+            id,
+            path,
+            is_primary
+          ),
+          collection_plants (
+            collection_id
+          )
+        `)
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
+        .order('scientific_name'));
 
-      const { data, error } = await query;
+      const { data, error } = await paginatedQuery;
 
       if (error) throw error;
       console.log('Query results:', {
@@ -196,14 +225,6 @@ function PlantsContent() {
         filtered = filtered.filter(plant => !plant.is_admin_plant || plant.user_id === user.id);
       }
       setPlants(filtered);
-      
-      if (filtered && filtered.length) {
-        const plantIds = filtered.map(p => p.id);
-        fetchGlobalSightings(plantIds);
-        if (user) {
-          fetchUserSightings(plantIds);
-        }
-      }
       
       setLoading(false);
     } catch (err) {
@@ -319,14 +340,14 @@ function PlantsContent() {
               className="flex items-center gap-2"
             >
               <Leaf className="h-4 w-4" />
-              Study {filteredPlants.length} Plants with Flashcards
+              Study {filteredAllPlants.length} Plants with Flashcards
             </Button>
           </div>
         </div>
 
         <PlantFilterPanel
           user={user}
-          plants={filteredPlants}
+          plants={allPlants}
           collections={collections}
           filters={{ ...filters, isFiltersExpanded: true }}
           setFilters={setFilters}
@@ -335,10 +356,11 @@ function PlantsContent() {
           showAdminPlants={showAdminPlants}
           getFavoritesCount={getFavoritesCount}
           getCollectionPlantCount={getCollectionPlantCount}
+          totalCount={totalCount}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredPlants.map((plant) => (
+          {paginatedPlants.map((plant) => (
             <Card 
               key={plant.id}
               className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer"
@@ -422,62 +444,56 @@ function PlantsContent() {
           ))}
         </div>
 
-        <div className="mt-8 mb-24 relative z-10 bg-gradient-to-br from-green-50 to-emerald-100 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white"
-              >
-                <option value={12}>12 per page</option>
-                <option value={24}>24 per page</option>
-                <option value={48}>48 per page</option>
-              </select>
-              <span className="text-sm text-gray-600">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} plants
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="bg-white"
-              >
-                First
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="bg-white"
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-gray-600">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="bg-white"
-              >
-                Next
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="bg-white"
-              >
-                Last
-              </Button>
-            </div>
+        <div className="mt-8 mb-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            >
+              <option value={12}>12 per page</option>
+              <option value={24}>24 per page</option>
+              <option value={48}>48 per page</option>
+            </select>
+            <span className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredAllPlants.length)} of {filteredAllPlants.length} plants
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              First
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {Math.ceil(filteredAllPlants.length / pageSize)}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredAllPlants.length / pageSize), p + 1))}
+              disabled={currentPage === Math.ceil(filteredAllPlants.length / pageSize)}
+            >
+              Next
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage(Math.ceil(filteredAllPlants.length / pageSize))}
+              disabled={currentPage === Math.ceil(filteredAllPlants.length / pageSize)}
+            >
+              Last
+            </Button>
           </div>
         </div>
       </main>
