@@ -108,6 +108,20 @@ function PlantsContent() {
 
   const fetchPlants = async () => {
     try {
+      // Get user's admin status first
+      let isAdmin = false;
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+        
+        isAdmin = profile?.is_admin || false;
+        console.log('User profile:', { userId: user.id, isAdmin });
+      }
+
+      // Build the query
       let query = supabase
         .from('plants')
         .select(`
@@ -121,17 +135,40 @@ function PlantsContent() {
             collection_id
           )
         `)
-        .order('scientific_name');
+        .eq('is_published', true);
 
       if (user) {
-        query = query.or(`is_published.eq.true,user_id.eq.${user.id}`);
+        if (isAdmin) {
+          // Admins can only see admin plants
+          query = query.eq('is_admin_plant', true);
+          console.log('Admin query: only showing admin plants');
+        } else {
+          // Regular users can see admin plants and their own plants
+          query = query.or(`is_admin_plant.eq.true,user_id.eq.${user.id}`);
+          console.log('Regular user query: showing admin plants and own plants');
+        }
       } else {
-        query = query.eq('is_published', true);
+        // Non-logged in users can only see admin plants
+        query = query.eq('is_admin_plant', true);
+        console.log('Non-user query: only showing admin plants');
       }
+
+      query = query.order('scientific_name');
 
       const { data, error } = await query;
 
       if (error) throw error;
+      console.log('Query results:', {
+        totalPlants: data?.length,
+        plants: data?.map(p => ({
+          id: p.id,
+          name: p.scientific_name,
+          isAdmin: p.is_admin_plant,
+          userId: p.user_id,
+          isPublished: p.is_published
+        }))
+      });
+
       let filtered = data || [];
       if (user && !showAdminPlants) {
         filtered = filtered.filter(plant => !plant.is_admin_plant || plant.user_id === user.id);
