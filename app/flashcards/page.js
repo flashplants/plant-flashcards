@@ -623,6 +623,7 @@ function FlashcardsContent() {
               <PlantFilterPanel
                 user={user}
                 plants={filteredPlants.length > 0 ? filteredPlants : plants}
+                filteredPlants={filteredPlants}
                 collections={collections}
                 filters={filters}
                 setFilters={setFilters}

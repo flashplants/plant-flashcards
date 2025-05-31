@@ -348,8 +348,9 @@ function PlantsContent() {
         <PlantFilterPanel
           user={user}
           plants={allPlants}
+          filteredPlants={filteredAllPlants}
           collections={collections}
-          filters={{ ...filters, isFiltersExpanded: true }}
+          filters={filters}
           setFilters={setFilters}
           showAdminSightings={showAdminSightings}
           showAdminCollections={showAdminCollections}

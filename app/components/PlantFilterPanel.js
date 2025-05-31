@@ -29,6 +29,7 @@ export default function PlantFilterPanel({
   showAdminPlants,
   getFavoritesCount,
   getCollectionPlantCount,
+  filteredPlants,
 }) {
   return (
     <div className="mb-6 bg-white rounded-lg shadow-md overflow-hidden">
@@ -40,7 +41,7 @@ export default function PlantFilterPanel({
           <Filter className="w-4 h-4 text-gray-600" />
           <span className="font-medium text-gray-700">Filters</span>
         </div>
-        <span className="ml-auto font-medium text-gray-600">Studying {plants.length} plants</span>
+        <span className="ml-auto font-medium text-gray-600">Studying {filteredPlants?.length || plants.length} plants</span>
         <svg
           className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${filters.isFiltersExpanded ? 'rotate-0' : '-rotate-90'}`}
           fill="none"
@@ -50,7 +51,9 @@ export default function PlantFilterPanel({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      <div className={`transition-all duration-300 ease-in-out ${filters.isFiltersExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'}`}>
+      <div 
+        className={`transition-all duration-300 ease-in-out overflow-hidden ${filters.isFiltersExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'}`}
+      >
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Main Filters Group */}
           <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
