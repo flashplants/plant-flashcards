@@ -38,6 +38,7 @@ function PlantsContent() {
   const [pageSize, setPageSize] = useState(12);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [needPracticeCount, setNeedPracticeCount] = useState(0);
 
   const [filters, setFilters] = useSyncedFilters();
 
@@ -383,6 +384,50 @@ function PlantsContent() {
     fetchPlants();
   }, [currentPage, pageSize]);
 
+  // Add getNeedPracticeCount logic (copied from /flashcards)
+  const getNeedPracticeCount = async () => {
+    if (!user) return 0;
+    try {
+      // Get all plants
+      const { data: plants } = await supabase
+        .from('plants')
+        .select('*')
+        .eq('is_published', true);
+      // Get user's flashcard answers
+      const { data: answers } = await supabase
+        .from('flashcard_answers')
+        .select('*')
+        .eq('user_id', user.id);
+      // Calculate statistics
+      const plantStats = {};
+      answers?.forEach(answer => {
+        if (!plantStats[answer.plant_id]) {
+          plantStats[answer.plant_id] = { correct: 0, total: 0 };
+        }
+        plantStats[answer.plant_id].total++;
+        if (answer.is_correct) {
+          plantStats[answer.plant_id].correct++;
+        }
+      });
+      // Count plants needing practice (same logic as the filter)
+      return plants?.filter(plant => {
+        const stats = plantStats[plant.id] || { correct: 0, total: 0 };
+        return stats.total === 0 || stats.correct / stats.total < 0.8;
+      }).length || 0;
+    } catch (error) {
+      console.error('Error getting need practice count:', error);
+      return 0;
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      getNeedPracticeCount().then(setNeedPracticeCount);
+    } else {
+      setNeedPracticeCount(0);
+    }
+  }, [user]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -433,6 +478,7 @@ function PlantsContent() {
           getFavoritesCount={getFavoritesCount}
           getCollectionPlantCount={getCollectionPlantCount}
           totalCount={totalCount}
+          needPracticeCount={needPracticeCount}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
