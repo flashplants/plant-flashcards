@@ -41,6 +41,25 @@ function PlantsContent() {
 
   const [filters, setFilters] = useSyncedFilters();
 
+  // Add a client-side sort for filteredAllPlants and paginatedPlants
+  function plantAlphaSort(a, b) {
+    const fields = [
+      'genus',
+      'specific_epithet',
+      'infraspecies_rank',
+      'infraspecies_epithet',
+      'variety',
+      'cultivar'
+    ];
+    for (const field of fields) {
+      const aVal = (a[field] || '').toLowerCase();
+      const bVal = (b[field] || '').toLowerCase();
+      if (aVal < bVal) return -1;
+      if (aVal > bVal) return 1;
+    }
+    return 0;
+  }
+
   // Filtering logic for all plants
   const filteredAllPlants = useMemo(() => {
     return applyFilters(allPlants, filters, { 
@@ -50,14 +69,14 @@ function PlantsContent() {
       globalSightings,
       showAdminPlants,
       user
-    });
+    }).sort(plantAlphaSort);
   }, [allPlants, filters, favorites, userSightings, globalSightings, showAdminPlants, user]);
 
   // Get paginated subset of filtered plants
   const paginatedPlants = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
-    return filteredAllPlants.slice(start, end);
+    return filteredAllPlants.slice(start, end).sort(plantAlphaSort);
   }, [filteredAllPlants, currentPage, pageSize]);
 
   const getFavoritesCount = () => allPlants.filter(p => favorites.has(p.id)).length;
@@ -176,7 +195,12 @@ function PlantsContent() {
             collection_id
           )
         `)
-        .order('scientific_name'));
+        .order('genus', { ascending: true })
+        .order('specific_epithet', { ascending: true })
+        .order('infraspecies_rank', { ascending: true })
+        .order('infraspecies_epithet', { ascending: true })
+        .order('variety', { ascending: true })
+        .order('cultivar', { ascending: true }));
 
       const { data: allPlantsData, error: allPlantsError } = await allPlantsQuery;
       if (allPlantsError) throw allPlantsError;
@@ -206,7 +230,12 @@ function PlantsContent() {
           )
         `)
         .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
-        .order('scientific_name'));
+        .order('genus', { ascending: true })
+        .order('specific_epithet', { ascending: true })
+        .order('infraspecies_rank', { ascending: true })
+        .order('infraspecies_epithet', { ascending: true })
+        .order('variety', { ascending: true })
+        .order('cultivar', { ascending: true }));
 
       const { data, error } = await paginatedQuery;
 
@@ -366,13 +395,13 @@ function PlantsContent() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
+        <div className="mb-8 mt-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Plants</h1>
-              <p className="mt-2 text-gray-600">Browse our collection of plants</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Plants</h1>
+              <p className="text-base sm:text-lg text-gray-600 mb-4">Browse our collection of plants</p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 mt-2 mb-2 w-full sm:w-auto">
               <Button
                 onClick={handleStudyPlants}
                 className="flex items-center gap-2 w-full sm:w-auto text-sm sm:text-base"
