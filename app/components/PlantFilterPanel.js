@@ -125,14 +125,14 @@ export default function PlantFilterPanel({
             </div>
           </div>
           {/* Sightings Filter Group */}
-          {showAdminSightings && (
-            <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
-              <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <Binoculars className="w-4 h-4 text-gray-600" />
-                Sightings
-                <Tooltip text="Filter by the number of times a plant has been sighted globally or by you."><Info className="w-4 h-4 text-gray-400 cursor-pointer" /></Tooltip>
-              </div>
-              {/* Global Sightings Buttons */}
+          <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+            <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <Binoculars className="w-4 h-4 text-gray-600" />
+              Sightings
+              <Tooltip text="Filter by the number of times a plant has been sighted globally or by you."><Info className="w-4 h-4 text-gray-400 cursor-pointer" /></Tooltip>
+            </div>
+            {/* Global Sightings Buttons */}
+            {showAdminSightings && (
               <div className="mb-2">
                 <div className="font-medium text-gray-600 mb-1">Global Sightings</div>
                 <div className="flex gap-2 flex-wrap">
@@ -194,74 +194,74 @@ export default function PlantFilterPanel({
                   </Button>
                 </div>
               </div>
-              {/* My Sightings Buttons */}
-              {user && (
-                <div>
-                  <div className="font-medium text-gray-600 mb-1">My Sightings</div>
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      variant={filters.mySightingsFilter === 'all' ? 'default' : 'outline'}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                      aria-pressed={filters.mySightingsFilter === 'all'}
-                      onClick={() => {
-                        setFilters({
-                          ...filters,
-                          mySightingsFilter: null,
-                          sightingsFilter: 'all'
-                        });
-                      }}
-                    >
-                      All
-                    </Button>
-                    <Button
-                      variant={filters.mySightingsFilter === '1' ? 'default' : 'outline'}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                      aria-pressed={filters.mySightingsFilter === '1'}
-                      onClick={() => {
-                        setFilters({
-                          ...filters,
-                          mySightingsFilter: '1',
-                          sightingsFilter: 'all'
-                        });
-                      }}
-                    >
-                      1+
-                    </Button>
-                    <Button
-                      variant={filters.mySightingsFilter === '2' ? 'default' : 'outline'}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                      aria-pressed={filters.mySightingsFilter === '2'}
-                      onClick={() => {
-                        setFilters({
-                          ...filters,
-                          mySightingsFilter: '2',
-                          sightingsFilter: 'all'
-                        });
-                      }}
-                    >
-                      2+
-                    </Button>
-                    <Button
-                      variant={filters.mySightingsFilter === '3' ? 'default' : 'outline'}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
-                      aria-pressed={filters.mySightingsFilter === '3'}
-                      onClick={() => {
-                        setFilters({
-                          ...filters,
-                          mySightingsFilter: '3',
-                          sightingsFilter: 'all'
-                        });
-                      }}
-                    >
-                      3+
-                    </Button>
-                  </div>
+            )}
+            {/* My Sightings Buttons */}
+            {user && (
+              <div>
+                <div className="font-medium text-gray-600 mb-1">My Sightings</div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={filters.mySightingsFilter === 'all' ? 'default' : 'outline'}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === 'all' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                    aria-pressed={filters.mySightingsFilter === 'all'}
+                    onClick={() => {
+                      setFilters({
+                        ...filters,
+                        mySightingsFilter: null,
+                        sightingsFilter: 'all'
+                      });
+                    }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={filters.mySightingsFilter === '1' ? 'default' : 'outline'}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === '1' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                    aria-pressed={filters.mySightingsFilter === '1'}
+                    onClick={() => {
+                      setFilters({
+                        ...filters,
+                        mySightingsFilter: '1',
+                        sightingsFilter: 'all'
+                      });
+                    }}
+                  >
+                    1+
+                  </Button>
+                  <Button
+                    variant={filters.mySightingsFilter === '2' ? 'default' : 'outline'}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === '2' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                    aria-pressed={filters.mySightingsFilter === '2'}
+                    onClick={() => {
+                      setFilters({
+                        ...filters,
+                        mySightingsFilter: '2',
+                        sightingsFilter: 'all'
+                      });
+                    }}
+                  >
+                    2+
+                  </Button>
+                  <Button
+                    variant={filters.mySightingsFilter === '3' ? 'default' : 'outline'}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${filters.mySightingsFilter === '3' ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'}`}
+                    aria-pressed={filters.mySightingsFilter === '3'}
+                    onClick={() => {
+                      setFilters({
+                        ...filters,
+                        mySightingsFilter: '3',
+                        sightingsFilter: 'all'
+                      });
+                    }}
+                  >
+                    3+
+                  </Button>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
           {/* Collections Filter Group */}
-          {showAdminCollections && (
+          {collections && collections.length > 0 && (
             <div className="space-y-4 border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
               <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <Filter className="w-4 h-4 text-gray-600" />
@@ -269,30 +269,31 @@ export default function PlantFilterPanel({
                 <Tooltip text="Curated groups of plants, either by admins or yourself."><Info className="w-4 h-4 text-gray-400 cursor-pointer" /></Tooltip>
               </div>
               <div className="flex flex-wrap gap-2">
-                {collections && collections.length > 0 ? (
-                  collections
-                    .filter(col => showAdminCollections || !col.is_admin_collection)
-                    .map(col => (
-                      <Button
-                        key={col.id}
-                        variant={filters.selectedCollection === col.id ? 'default' : 'outline'}
-                        onClick={() => setFilters({
-                          ...filters,
-                          selectedCollection: filters.selectedCollection === col.id ? null : col.id
-                        })}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${
-                          filters.selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'
-                        }`}
-                      >
-                        <span>{col.name}</span>
-                        <Badge className="ml-2 bg-green-600 text-white font-semibold">
-                          {getCollectionPlantCount(col) || 0}
-                        </Badge>
-                      </Button>
-                    ))
-                ) : (
-                  <p className="text-gray-500 text-sm">No collections available</p>
-                )}
+                {collections
+                  .filter(col => {
+                    // Always show user's own collections
+                    if (user && col.user_id === user.id) return true;
+                    // Show admin collections if showAdminCollections is true
+                    return col.is_admin_collection && showAdminCollections;
+                  })
+                  .map(col => (
+                    <Button
+                      key={col.id}
+                      variant={filters.selectedCollection === col.id ? 'default' : 'outline'}
+                      onClick={() => setFilters({
+                        ...filters,
+                        selectedCollection: filters.selectedCollection === col.id ? null : col.id
+                      })}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-md border-2 hover:bg-green-100 ${
+                        filters.selectedCollection === col.id ? 'border-green-600 bg-green-50 text-green-900' : 'border-gray-300 bg-white text-gray-700'
+                      }`}
+                    >
+                      <span>{col.name}</span>
+                      <Badge className="ml-2 bg-green-600 text-white font-semibold">
+                        {getCollectionPlantCount(col) || 0}
+                      </Badge>
+                    </Button>
+                  ))}
               </div>
             </div>
           )}
