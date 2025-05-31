@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useSyncedFilters } from '../hooks/useSyncedFilters';
 import { applyFilters } from '../utils/filters';
 import {
@@ -37,6 +37,7 @@ import { buildFullPlantName, renderPlantName } from '../utils/plantNameUtils';
 import { Badge } from "@/components/ui/badge";
 import PlantFilterPanel from '../components/PlantFilterPanel';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { debounce } from 'lodash';
 
 // Tooltip component (simple, inline for now)
 function Tooltip({ text, children }) {
@@ -52,35 +53,27 @@ function Tooltip({ text, children }) {
   );
 }
 
-// Debounce function
-const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
-
-export default function PlantFlashcardApp() {
+function FlashcardsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, isAuthenticated } = useAuth();
   const [plants, setPlants] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
-  const [answered, setAnswered] = useState(new Set());
+  const [globalSightings, setGlobalSightings] = useState([]);
+  const [userSightings, setUserSightings] = useState([]);
+  const [isFetchingUserData, setIsFetchingUserData] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
+  const [answered, setAnswered] = useState(new Set());
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
   const [collections, setCollections] = useState([]);
   const [showAuth, setShowAuth] = useState(false);
-  const [isFetchingUserData, setIsFetchingUserData] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
-  const { user, isAuthenticated } = useAuth();
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isFiltering, setIsFiltering] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [showSessionSummary, setShowSessionSummary] = useState(false);
   const [incorrectPlants, setIncorrectPlants] = useState([]);
@@ -89,10 +82,6 @@ export default function PlantFlashcardApp() {
   const [showAdminPlants, setShowAdminPlants] = useState(true);
   const [showAdminCollections, setShowAdminCollections] = useState(true);
   const [showAdminSightings, setShowAdminSightings] = useState(true);
-  const [globalSightings, setGlobalSightings] = useState({});
-  const [userSightings, setUserSightings] = useState({});
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [filters, setFilters] = useSyncedFilters();
 
@@ -914,5 +903,13 @@ export default function PlantFlashcardApp() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function FlashcardsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <FlashcardsContent />
+    </Suspense>
   );
 } 
